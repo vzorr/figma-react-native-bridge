@@ -1,9 +1,10 @@
 // src/handlers/extract-flows-handler.ts
-// New handler specifically for flow-based extraction
+// Complete handler specifically for flow-based extraction with getFlowById method
 
 import { logger, LogFunction } from '@core/logger';
 import { ErrorHandler } from '@core/error-handler';
 import { MESSAGE_TYPES, FLOW_MESSAGE_TYPES } from '@core/constants';
+import { FlowStructure, FlowDetectionResult } from '@core/types';
 import { FlowExtractor } from '@extractors/flow-extractor';
 import { ThemeGenerator } from '@generators/theme-generator';
 import { sendProgress } from '@utils/figma-helpers';
@@ -14,6 +15,10 @@ const MODULE_NAME = 'ExtractFlowsHandler';
 export class ExtractFlowsHandler {
   private flowExtractor: FlowExtractor;
   private themeGenerator: ThemeGenerator;
+  
+  // Cache for detected flows
+  private detectedFlowsCache: FlowStructure[] = [];
+  private lastDetectionResult: FlowDetectionResult | null = null;
 
   constructor() {
     this.flowExtractor = new FlowExtractor();
@@ -32,6 +37,11 @@ export class ExtractFlowsHandler {
       // Step 1: Detect flows and user roles
       logger.info(MODULE_NAME, FUNC_NAME, 'Analyzing flows and user roles...');
       const flowDetectionResult = this.flowExtractor.extractFlowsFromDesign();
+      
+      // Cache the detected flows for later retrieval
+      this.detectedFlowsCache = flowDetectionResult.flows;
+      this.lastDetectionResult = flowDetectionResult;
+      
       sendProgress(40);
       
       // Step 2: Generate comprehensive theme based on flows
@@ -93,9 +103,8 @@ export class ExtractFlowsHandler {
     try {
       logger.info(MODULE_NAME, FUNC_NAME, `Handling flow selection: ${flowId}`);
       
-      // Get the specific flow details
-      const flowDetectionResult = this.flowExtractor.extractFlowsFromDesign();
-      const selectedFlow = flowDetectionResult.flows.find(flow => flow.id === flowId);
+      // Get the specific flow from cache
+      const selectedFlow = this.getFlowById(flowId);
       
       if (!selectedFlow) {
         throw new Error(`Flow with ID ${flowId} not found`);
@@ -133,6 +142,48 @@ export class ExtractFlowsHandler {
         details: (error as Error).message
       });
     }
+  }
+
+  @LogFunction(MODULE_NAME)
+  getFlowById(flowId: string): FlowStructure | null {
+    const FUNC_NAME = 'getFlowById';
+    
+    try {
+      const flow = this.detectedFlowsCache.find(flow => flow.id === flowId);
+      
+      if (flow) {
+        logger.debug(MODULE_NAME, FUNC_NAME, `Found flow: ${flowId}`, {
+          flowName: flow.name,
+          screenCount: flow.screens.length
+        });
+        return flow;
+      } else {
+        logger.warn(MODULE_NAME, FUNC_NAME, `Flow not found: ${flowId}`, {
+          availableFlows: this.detectedFlowsCache.map(f => ({ id: f.id, name: f.name }))
+        });
+        return null;
+      }
+    } catch (error) {
+      logger.error(MODULE_NAME, FUNC_NAME, 'Error retrieving flow:', error as Error, { flowId });
+      return null;
+    }
+  }
+
+  @LogFunction(MODULE_NAME)
+  getAllFlows(): FlowStructure[] {
+    return [...this.detectedFlowsCache]; // Return copy to prevent mutation
+  }
+
+  @LogFunction(MODULE_NAME)
+  getLastDetectionResult(): FlowDetectionResult | null {
+    return this.lastDetectionResult;
+  }
+
+  @LogFunction(MODULE_NAME)
+  clearFlowCache(): void {
+    this.detectedFlowsCache = [];
+    this.lastDetectionResult = null;
+    logger.info(MODULE_NAME, 'clearFlowCache', 'Flow cache cleared');
   }
 
   @LogFunction(MODULE_NAME)
