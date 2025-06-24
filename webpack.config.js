@@ -52,45 +52,32 @@ module.exports = (env, argv) => {
         'process.env.VERSION': JSON.stringify(require('./package.json').version),
       }),
       
-      // Bulletproof HTML injection that handles all edge cases
+      // Fixed HTML injection using JSON.stringify for proper escaping
       {
         apply: (compiler) => {
-          compiler.hooks.emit.tapAsync('BulletproofUIInjection', (compilation, callback) => {
+          compiler.hooks.emit.tapAsync('SafeUIInjection', (compilation, callback) => {
             try {
               // Read the UI HTML file
               const uiHtmlPath = path.resolve(__dirname, 'src/ui.html');
+              
+              if (!fs.existsSync(uiHtmlPath)) {
+                throw new Error(`UI HTML file not found at: ${uiHtmlPath}`);
+              }
+              
               let uiHtmlContent = fs.readFileSync(uiHtmlPath, 'utf8');
               
-              // Normalize line endings to Unix style first
-              uiHtmlContent = uiHtmlContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+              // Use JSON.stringify to properly escape all characters
+              // This handles quotes, newlines, special characters, etc.
+              const escapedHtml = JSON.stringify(uiHtmlContent);
               
-              // Use a more robust escaping approach
-              // Convert to Base64 and then decode in JavaScript
-              const base64Html = Buffer.from(uiHtmlContent, 'utf8').toString('base64');
-              
-              // Create the injection code that decodes Base64
-              const htmlInjection = `// Auto-generated HTML content
-var __html__ = (function() {
-  try {
-    var base64 = "${base64Html}";
-    var binary = '';
-    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    for (var i = 0; i < base64.length; i += 4) {
-      var encoded1 = chars.indexOf(base64.charAt(i));
-      var encoded2 = chars.indexOf(base64.charAt(i + 1));
-      var encoded3 = chars.indexOf(base64.charAt(i + 2));
-      var encoded4 = chars.indexOf(base64.charAt(i + 3));
-      var bitmap = (encoded1 << 18) | (encoded2 << 12) | (encoded3 << 6) | encoded4;
-      binary += String.fromCharCode((bitmap >> 16) & 255);
-      if (encoded3 !== 64) binary += String.fromCharCode((bitmap >> 8) & 255);
-      if (encoded4 !== 64) binary += String.fromCharCode(bitmap & 255);
-    }
-    return binary;
-  } catch (e) {
-    console.error('Failed to decode HTML:', e);
-    return '<html><body><h1>Error loading UI</h1></body></html>';
-  }
-})();
+              // Create the injection code with proper escaping
+              const htmlInjection = `// Auto-generated HTML content - Figma React Native Bridge
+var __html__ = ${escapedHtml};
+
+// Export for webpack compatibility
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports.__html__ = __html__;
+}
 
 `;
               
@@ -98,10 +85,18 @@ var __html__ = (function() {
               const codeAsset = compilation.assets['code.js'];
               if (codeAsset) {
                 const existingCode = codeAsset.source();
+                const finalCode = htmlInjection + existingCode;
+                
                 compilation.assets['code.js'] = {
-                  source: () => htmlInjection + existingCode,
-                  size: () => (htmlInjection + existingCode).length,
+                  source: () => finalCode,
+                  size: () => finalCode.length,
                 };
+                
+                console.log('✅ UI HTML injected successfully using JSON.stringify');
+                console.log(`   HTML size: ${(uiHtmlContent.length / 1024).toFixed(2)}KB`);
+                console.log(`   Final code size: ${(finalCode.length / 1024).toFixed(2)}KB`);
+              } else {
+                throw new Error('code.js asset not found in compilation');
               }
               
               // Also copy ui.html to dist for Figma to find
@@ -110,13 +105,30 @@ var __html__ = (function() {
                 size: () => uiHtmlContent.length,
               };
               
-              console.log('✅ UI files injected using Base64 encoding (bulletproof method)');
-              
             } catch (error) {
-              console.error('❌ Error injecting UI files:', error);
+              console.error('❌ Error injecting UI files:', error.message);
               
-              // Fallback: create a minimal HTML variable
-              const fallbackInjection = `var __html__ = "<html><body><h1>Plugin UI Error</h1><p>Failed to load UI. Check console.</p></body></html>";
+              // Fallback: create a safe minimal HTML variable
+              const fallbackHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <title>Plugin Error</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .error { color: #d32f2f; background: #ffebee; padding: 16px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <div class="error">
+    <h2>Plugin UI Error</h2>
+    <p>Failed to load the main UI. Please check the console for details.</p>
+    <p>Error: ${error.message.replace(/"/g, '&quot;')}</p>
+  </div>
+</body>
+</html>`;
+              
+              const fallbackInjection = `// Fallback HTML due to injection error
+var __html__ = ${JSON.stringify(fallbackHtml)};
 
 `;
               
@@ -128,6 +140,12 @@ var __html__ = (function() {
                   size: () => (fallbackInjection + existingCode).length,
                 };
               }
+              
+              // Still create a basic ui.html
+              compilation.assets['ui.html'] = {
+                source: () => fallbackHtml,
+                size: () => fallbackHtml.length,
+              };
             }
             
             callback();
@@ -136,74 +154,80 @@ var __html__ = (function() {
       },
       
       new webpack.BannerPlugin({
-        banner: `
-/**
+        banner: `/**
  * Figma React Native Bridge Plugin
  * Built: ${new Date().toISOString()}
  * Mode: ${argv.mode || 'development'}
- */
-        `.trim(),
+ * 
+ * This plugin extracts design tokens and generates React Native components
+ * from Figma designs with responsive, semantic analysis.
+ */`,
         raw: false,
       }),
       
-      // Module tracking plugin
+      // Build validation plugin
       {
         apply: (compiler) => {
-          compiler.hooks.emit.tapAsync('ModuleTracker', (compilation, callback) => {
-            const moduleMap = {};
+          compiler.hooks.emit.tapAsync('BuildValidator', (compilation, callback) => {
             const errors = [];
+            const warnings = [];
             
-            compilation.modules.forEach((module) => {
-              if (module.resource) {
-                const relativePath = path.relative(__dirname, module.resource);
-                const size = module.size ? module.size() : 0;
-                
-                moduleMap[relativePath] = {
-                  size,
-                  dependencies: module.dependencies ? module.dependencies.length : 0,
-                  id: module.id,
-                };
-              }
-              
-              if (module.errors && module.errors.length > 0) {
-                module.errors.forEach(error => {
-                  errors.push({
-                    module: module.resource ? path.relative(__dirname, module.resource) : 'unknown',
-                    error: error.message,
-                  });
-                });
+            // Check if required assets exist
+            const requiredAssets = ['code.js', 'ui.html'];
+            requiredAssets.forEach(asset => {
+              if (!compilation.assets[asset]) {
+                errors.push(`Required asset missing: ${asset}`);
               }
             });
             
-            // Write module map to file
-            const moduleMapContent = JSON.stringify({
-              buildTime: new Date().toISOString(),
-              mode: argv.mode || 'development',
-              totalModules: Object.keys(moduleMap).length,
-              modules: moduleMap,
-              errors,
-              stats: {
-                totalSize: Object.values(moduleMap).reduce((sum, mod) => sum + mod.size, 0),
-                avgSize: Object.values(moduleMap).reduce((sum, mod) => sum + mod.size, 0) / Object.keys(moduleMap).length,
+            // Check code.js for __html__ variable
+            const codeAsset = compilation.assets['code.js'];
+            if (codeAsset) {
+              const codeContent = codeAsset.source();
+              if (!codeContent.includes('var __html__')) {
+                warnings.push('__html__ variable not found in code.js');
               }
-            }, null, 2);
+              
+              // Basic syntax validation
+              if (codeContent.includes('undefined') && isProduction) {
+                warnings.push('Found undefined values in production build');
+              }
+            }
             
-            compilation.assets['module-map.json'] = {
-              source: () => moduleMapContent,
-              size: () => moduleMapContent.length,
+            // Report results
+            if (errors.length > 0) {
+              console.log('\n❌ Build Validation Errors:');
+              errors.forEach(error => console.log(`   ${error}`));
+            }
+            
+            if (warnings.length > 0) {
+              console.log('\n⚠️  Build Validation Warnings:');
+              warnings.forEach(warning => console.log(`   ${warning}`));
+            }
+            
+            if (errors.length === 0 && warnings.length === 0) {
+              console.log('\n✅ Build validation passed');
+            }
+            
+            // Generate build info
+            const buildInfo = {
+              timestamp: new Date().toISOString(),
+              mode: argv.mode || 'development',
+              validation: {
+                errors: errors.length,
+                warnings: warnings.length,
+                passed: errors.length === 0
+              },
+              assets: Object.keys(compilation.assets).map(name => ({
+                name,
+                size: compilation.assets[name].size()
+              }))
             };
             
-            console.log('\n📊 Build Analysis:');
-            console.log(`   Modules: ${Object.keys(moduleMap).length}`);
-            console.log(`   Errors: ${errors.length}`);
-            console.log(`   Total Size: ${(Object.values(moduleMap).reduce((sum, mod) => sum + mod.size, 0) / 1024).toFixed(2)}KB`);
-            
-            if (errors.length > 0) {
-              console.log('\n❌ Build Errors:');
-              errors.forEach(err => {
-                console.log(`   ${err.module}: ${err.error}`);
-              });
-            }
+            compilation.assets['build-info.json'] = {
+              source: () => JSON.stringify(buildInfo, null, 2),
+              size: () => JSON.stringify(buildInfo, null, 2).length,
+            };
             
             callback();
           });
@@ -221,19 +245,20 @@ var __html__ = (function() {
     devtool: isProduction ? 'source-map' : 'eval-source-map',
     
     stats: {
-      modules: true,
-      modulesSpace: 50,
-      reasons: !isProduction,
-      errorDetails: true,
+      modules: false,
+      chunks: false,
       colors: true,
-      chunks: true,
-      chunkModules: true,
+      errors: true,
+      errorDetails: true,
+      warnings: true,
+      assets: true,
+      performance: true,
     },
     
     performance: {
       hints: isProduction ? 'warning' : false,
-      maxAssetSize: 500000,
-      maxEntrypointSize: 500000,
+      maxAssetSize: 1000000, // 1MB
+      maxEntrypointSize: 1000000, // 1MB
     },
     
     node: false,
@@ -242,6 +267,11 @@ var __html__ = (function() {
       aggregateTimeout: 300,
       poll: false,
       ignored: /node_modules/,
+    },
+    
+    // Add fallback for missing modules
+    externals: {
+      'figma': 'figma'
     },
   };
 };

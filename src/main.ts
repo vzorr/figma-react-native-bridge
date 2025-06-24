@@ -8,7 +8,6 @@ import { ExtractValuesHandler } from './handlers/extract-values-handler';
 import ExtractScreensHandler from './handlers/extract-screens-handler'; // Default import
 
 declare const figma: any;
-declare var __html__: string;
 
 const MODULE_NAME = 'Main';
 
@@ -37,13 +36,8 @@ class FigmaReactNativeBridge {
     try {
       logger.info(MODULE_NAME, 'init', 'Starting plugin initialization');
       
-      // Check if __html__ is available
-      if (typeof __html__ === 'undefined') {
-        throw new Error('UI HTML not found. Make sure ui.html is being injected during build.');
-      }
-      
-      // Show UI
-      figma.showUI(__html__, { 
+      // Show UI using the ui.html file path instead of inline HTML
+      figma.showUI(__dirname + '/ui.html', { 
         width: 400, 
         height: 600,
         title: 'React Native Bridge'
