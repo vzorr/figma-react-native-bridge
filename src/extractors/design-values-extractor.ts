@@ -80,6 +80,40 @@ export class DesignValuesExtractor extends BaseExtractor {
     }
   }
 
+  // Implementation of the abstract extract method from BaseExtractor
+  extract(nodes: any[]): ExtractedValues {
+    const values: ExtractedValues = {
+      colors: new Set<string>(),
+      fontSizes: new Set<number>(),
+      fontWeights: new Set<string>(),
+      fontFamilies: new Set<string>(),
+      borderRadius: new Set<number>(),
+      spacing: new Set<number>(),
+      shadows: new Set<string>(),
+      opacity: new Set<number>(),
+      buttons: [],
+      inputs: [],
+      headings: [],
+      labels: [],
+      cards: [],
+      navigationItems: []
+    };
+
+    nodes.forEach((node: any) => {
+      try {
+        this.extractBasicTokens(node, values);
+        this.extractSemanticComponents(node, values);
+      } catch (nodeError) {
+        logger.debug(MODULE_NAME, 'extract', 'Skipped problematic node', { 
+          node: node?.name,
+          error: nodeError 
+        });
+      }
+    });
+
+    return values;
+  }
+
   @LogFunction(MODULE_NAME)
   extractBasicTokens(node: any, values: ExtractedValues): void {
     const FUNC_NAME = 'extractBasicTokens';

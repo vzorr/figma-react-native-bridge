@@ -7,8 +7,10 @@ import { DEVICE_BREAKPOINTS } from '@core/constants';
 
 const MODULE_NAME = 'DeviceDetector';
 
+export type DeviceType = 'mobile' | 'tablet' | 'desktop' | 'unknown';
+
 export interface DeviceDetectionResult {
-  deviceType: 'mobile' | 'tablet' | 'desktop' | 'unknown';
+  deviceType: DeviceType;
   orientation: 'portrait' | 'landscape' | 'square';
   confidence: number;
   characteristics: {
@@ -71,7 +73,7 @@ export class DeviceDetector {
   }
 
   @LogFunction(MODULE_NAME)
-  private determineDeviceType(width: number, height: number, aspectRatio: number): 'mobile' | 'tablet' | 'desktop' | 'unknown' {
+  private determineDeviceType(width: number, height: number, aspectRatio: number): DeviceType {
     const FUNC_NAME = 'determineDeviceType';
     
     try {
@@ -126,7 +128,7 @@ export class DeviceDetector {
   }
 
   @LogFunction(MODULE_NAME)
-  private calculateConfidence(width: number, height: number, deviceType: string): number {
+  private calculateConfidence(width: number, height: number, deviceType: DeviceType): number {
     try {
       // Higher confidence for standard resolutions
       const standardResolutions = [
@@ -161,7 +163,7 @@ export class DeviceDetector {
   }
 
   @LogFunction(MODULE_NAME)
-  private estimatePixelDensity(width: number, height: number, deviceType: string): string {
+  private estimatePixelDensity(width: number, height: number, deviceType: DeviceType): string {
     try {
       // Estimate based on common device patterns
       switch (deviceType) {
@@ -297,7 +299,7 @@ export class DeviceDetector {
   isResponsiveDesign(devices: DeviceDetectionResult[]): {
     isResponsive: boolean;
     coverageScore: number;
-    missingDeviceTypes: string[];
+    missingDeviceTypes: DeviceType[];
     recommendations: string[];
   } {
     const FUNC_NAME = 'isResponsiveDesign';
@@ -309,7 +311,7 @@ export class DeviceDetector {
       const hasMultipleTypes = deviceTypes.size > 1;
       const hasMultipleOrientations = orientations.size > 1;
       
-      const expectedTypes = ['mobile', 'tablet', 'desktop'];
+      const expectedTypes: DeviceType[] = ['mobile', 'tablet', 'desktop'];
       const missingTypes = expectedTypes.filter(type => !deviceTypes.has(type));
       
       const coverageScore = (deviceTypes.size / expectedTypes.length) * 100;

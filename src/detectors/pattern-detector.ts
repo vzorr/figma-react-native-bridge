@@ -22,18 +22,17 @@ export interface PatternAnalysis {
 }
 
 class PatternDetector {
-  private log: LogFunction;
 
   constructor() {
-    this.log = logger.createLogger(MODULE_NAME);
-    this.log('PatternDetector initialized');
+    logger.info(MODULE_NAME, 'constructor', 'PatternDetector initialized');
   }
 
   /**
    * Analyze design patterns in components
    */
+  @LogFunction(MODULE_NAME)
   analyzePatterns(components: any[]): PatternAnalysis {
-    this.log('Starting pattern analysis', { componentCount: components.length });
+    logger.info(MODULE_NAME, 'analyzePatterns', 'Starting pattern analysis', { componentCount: components.length });
 
     try {
       const patterns = this.detectPatterns(components);
@@ -48,7 +47,7 @@ class PatternDetector {
         recommendations
       };
 
-      this.log('Pattern analysis complete', {
+      logger.info(MODULE_NAME, 'analyzePatterns', 'Pattern analysis complete', {
         patternsFound: patterns.length,
         complexity,
         consistency: Math.round(consistency * 100)
@@ -56,7 +55,7 @@ class PatternDetector {
 
       return analysis;
     } catch (error) {
-      this.log('Error in pattern analysis', { error });
+      logger.error(MODULE_NAME, 'analyzePatterns', 'Error in pattern analysis:', error as Error);
       return {
         patterns: [],
         complexity: 'low',
@@ -69,8 +68,9 @@ class PatternDetector {
   /**
    * Detect common UI patterns
    */
+  @LogFunction(MODULE_NAME)
   private detectPatterns(components: any[]): DesignPattern[] {
-    this.log('Detecting UI patterns');
+    logger.debug(MODULE_NAME, 'detectPatterns', 'Detecting UI patterns');
 
     const patterns: DesignPattern[] = [];
     const componentTypes = this.categorizeComponents(components);
@@ -185,7 +185,7 @@ class PatternDetector {
       });
     }
 
-    this.log('Pattern detection complete', { patternsDetected: patterns.length });
+    logger.debug(MODULE_NAME, 'detectPatterns', 'Pattern detection complete', { patternsDetected: patterns.length });
     return patterns;
   }
 

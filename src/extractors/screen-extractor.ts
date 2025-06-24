@@ -53,8 +53,8 @@ export class ScreenExtractor {
         name: frame.name,
         width: safeGetNumber(frame.width),
         height: safeGetNumber(frame.height),
-        page: frame.parent ? frame.parent.name : 'Unknown',
-        backgroundColor: getNodeBackgroundColor(frame),
+        page: frame.parent ? frame.parent.name : undefined,
+        backgroundColor: getNodeBackgroundColor(frame) || undefined,
         components: frame.children ? this.extractComponentHierarchyWithSemantics(frame.children) : [],
         layoutType: this.determineLayoutType(frame),
         deviceType: this.determineDeviceType(safeGetNumber(frame.width), safeGetNumber(frame.height)),
@@ -112,15 +112,15 @@ export class ScreenExtractor {
         y: safeGetNumber(node.y),
         width: safeGetNumber(node.width),
         height: safeGetNumber(node.height),
-        backgroundColor: getNodeBackgroundColor(node),
+        backgroundColor: getNodeBackgroundColor(node) || undefined,
         borderRadius: safeGetNumber(node.cornerRadius, 0)
       };
 
       if (node.type === 'TEXT') {
         baseData.text = node.characters;
         baseData.fontSize = safeGetNumber(node.fontSize);
-        baseData.fontWeight = this.getNodeFontWeight(node);
-        baseData.textColor = this.getNodeTextColor(node);
+        baseData.fontWeight = this.getNodeFontWeight(node) || undefined;
+        baseData.textColor = this.getNodeTextColor(node) || undefined;
         baseData.textAlign = node.textAlignHorizontal;
       }
 
