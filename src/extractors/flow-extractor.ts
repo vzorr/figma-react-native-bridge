@@ -1,90 +1,70 @@
-// src/detectors/flow-detector.ts
-// New file - Advanced flow detection beyond basic naming patterns
+// src/extractors/flow-extractor.ts
+// Complete Flow Extractor implementation extending existing functionality
 
 import { logger, LogFunction } from '@core/logger';
 import { ErrorHandler } from '@core/error-handler';
-import { FlowStructure, ScreenStructure, UserRole, FlowDetectionResult } from '@core/types';
-import { FLOW_PATTERNS, DETECTION_THRESHOLDS } from '@core/constants';
-import { getAllPages } from '@utils/figma-helpers';
+import { FlowDetectionResult, FlowStructure, ScreenStructure, UserRole, FlowAwareExtractionResult } from '@core/types';
+import { ScreenExtractor } from '@extractors/screen-extractor';
+import { RoleDetector } from '@detectors/role-detector';
+import FlowDetector from '@detectors/flow-detector';
+import { getAllPages, getAllFrames } from '@utils/figma-helpers';
 
-const MODULE_NAME = 'FlowDetector';
+const MODULE_NAME = 'FlowExtractor';
 
-export interface FlowDetectionStrategy {
-  name: string;
-  detect(screens: ScreenStructure[]): FlowGroup[];
-  confidence: number;
-}
+export class FlowExtractor {
+  private screenExtractor: ScreenExtractor;
+  private roleDetector: RoleDetector;
+  private flowDetector: FlowDetector;
 
-export interface FlowGroup {
-  id: string;
-  screens: ScreenStructure[];
-  confidence: number;
-  detectionMethod: string;
-  metadata: {
-    role?: UserRole;
-    flowType?: string;
-    navigationPattern?: string;
-    sequenceEvidence?: string[];
-  };
-}
-
-export class FlowDetector {
+  constructor() {
+    this.screenExtractor = new ScreenExtractor();
+    this.roleDetector = new RoleDetector();
+    this.flowDetector = new FlowDetector();
+    logger.info(MODULE_NAME, 'constructor', 'FlowExtractor initialized');
+  }
 
   @LogFunction(MODULE_NAME, true)
-  detectFlowsAdvanced(screens: ScreenStructure[], detectedRoles: UserRole[]): FlowDetectionResult {
-    const FUNC_NAME = 'detectFlowsAdvanced';
+  extractFlowsFromDesign(): FlowDetectionResult {
+    const FUNC_NAME = 'extractFlowsFromDesign';
     
     try {
-      logger.info(MODULE_NAME, FUNC_NAME, 'Starting advanced flow detection', {
-        totalScreens: screens.length,
-        detectedRoles: detectedRoles.length
-      });
+      logger.info(MODULE_NAME, FUNC_NAME, 'Starting comprehensive flow extraction');
 
-      // Apply multiple detection strategies
-      const strategies: FlowDetectionStrategy[] = [
-        this.createNamingPatternStrategy(),
-        this.createPageStructureStrategy(),
-        this.createPrototypeLinkStrategy(),
-        this.createSpatialProximityStrategy(),
-        this.createContentSimilarityStrategy()
-      ];
+      // Step 1: Extract all screens from the design
+      const screens = this.screenExtractor.extractAllScreens();
+      logger.info(MODULE_NAME, FUNC_NAME, `Extracted ${screens.length} screens`);
 
-      const allFlowGroups: FlowGroup[] = [];
-      
-      // Run each strategy
-      for (const strategy of strategies) {
-        try {
-          const groups = strategy.detect(screens);
-          logger.debug(MODULE_NAME, FUNC_NAME, `Strategy ${strategy.name} found ${groups.length} groups`);
-          allFlowGroups.push(...groups);
-        } catch (strategyError) {
-          logger.warn(MODULE_NAME, FUNC_NAME, `Strategy ${strategy.name} failed:`, { error: strategyError });
-        }
+      if (screens.length === 0) {
+        logger.warn(MODULE_NAME, FUNC_NAME, 'No screens found for flow detection');
+        return this.createEmptyFlowResult();
       }
 
-      // Merge and optimize flow groups
-      const optimizedFlows = this.optimizeFlowGroups(allFlowGroups, detectedRoles);
-      
-      // Convert to final FlowStructure format
-      const flows = this.convertToFlowStructures(optimizedFlows);
-      
-      // Identify orphaned screens
-      const flowScreenIds = new Set(flows.flatMap(flow => flow.screens.map(s => s.name)));
-      const orphanedScreens = screens.filter(screen => !flowScreenIds.has(screen.name));
-      
+      // Step 2: Detect user roles from all nodes
+      const allNodes = this.getAllNodesFromDesign();
+      const userRoles = this.roleDetector.detectUserRoles(allNodes);
+      logger.info(MODULE_NAME, FUNC_NAME, `Detected ${userRoles.length} user roles`);
+
+      // Step 3: Advanced flow detection using multiple strategies
+      const flowDetectionResult = this.flowDetector.detectFlowsAdvanced(screens, userRoles);
+      logger.info(MODULE_NAME, FUNC_NAME, `Detected ${flowDetectionResult.flows.length} flows`);
+
+      // Step 4: Enhance flows with additional metadata
+      const enhancedFlows = this.enhanceFlowsWithMetadata(flowDetectionResult.flows);
+
+      // Step 5: Generate final result
       const result: FlowDetectionResult = {
-        flows,
-        orphanedScreens,
-        roleDistribution: this.calculateRoleDistribution(detectedRoles),
-        flowTypeDistribution: this.calculateFlowTypeDistribution(flows),
-        detectionQuality: this.calculateDetectionQuality(screens, flows),
-        recommendations: this.generateAdvancedRecommendations(flows, orphanedScreens, allFlowGroups)
+        ...flowDetectionResult,
+        flows: enhancedFlows,
+        recommendations: [
+          ...flowDetectionResult.recommendations,
+          ...this.generateFlowExtractorRecommendations(enhancedFlows, screens)
+        ]
       };
 
-      logger.info(MODULE_NAME, FUNC_NAME, 'Advanced flow detection complete', {
-        flowsDetected: flows.length,
-        orphanedScreens: orphanedScreens.length,
-        averageConfidence: this.calculateAverageConfidence(optimizedFlows)
+      logger.info(MODULE_NAME, FUNC_NAME, 'Flow extraction complete', {
+        totalFlows: result.flows.length,
+        orphanedScreens: result.orphanedScreens.length,
+        overallQuality: result.detectionQuality.roleDetectionAccuracy
       });
 
       return result;
@@ -93,664 +73,501 @@ export class FlowDetector {
       ErrorHandler.handle(error as Error, {
         module: MODULE_NAME,
         function: FUNC_NAME,
-        operation: 'advanced flow detection'
+        operation: 'comprehensive flow extraction from design'
       });
+      
+      return this.createEmptyFlowResult();
+    }
+  }
+
+  @LogFunction(MODULE_NAME)
+  extractFlowsFromCurrentPage(): FlowDetectionResult {
+    const FUNC_NAME = 'extractFlowsFromCurrentPage';
+    
+    try {
+      logger.info(MODULE_NAME, FUNC_NAME, 'Extracting flows from current page only');
+
+      // Get frames from current page only
+      const currentPageFrames = figma.currentPage.children.filter((node: any) => node.type === 'FRAME');
+      
+      if (currentPageFrames.length === 0) {
+        logger.warn(MODULE_NAME, FUNC_NAME, 'No frames found on current page');
+        return this.createEmptyFlowResult();
+      }
+
+      // Convert frames to screen structures
+      const screens = currentPageFrames.map((frame: any) => 
+        this.screenExtractor.extractEnhancedScreenStructure(frame)
+      );
+
+      // Detect roles from current page nodes
+      const currentPageNodes = figma.currentPage.findAll();
+      const userRoles = this.roleDetector.detectUserRoles(currentPageNodes);
+
+      // Run flow detection
+      const flowDetectionResult = this.flowDetector.detectFlowsAdvanced(screens, userRoles);
+
+      logger.info(MODULE_NAME, FUNC_NAME, 'Current page flow extraction complete', {
+        screensProcessed: screens.length,
+        flowsDetected: flowDetectionResult.flows.length
+      });
+
+      return flowDetectionResult;
+
+    } catch (error) {
+      ErrorHandler.handle(error as Error, {
+        module: MODULE_NAME,
+        function: FUNC_NAME,
+        operation: 'current page flow extraction'
+      });
+      
+      return this.createEmptyFlowResult();
+    }
+  }
+
+  @LogFunction(MODULE_NAME)
+  extractSpecificFlow(flowId: string): FlowStructure | null {
+    const FUNC_NAME = 'extractSpecificFlow';
+    
+    try {
+      logger.info(MODULE_NAME, FUNC_NAME, `Extracting specific flow: ${flowId}`);
+
+      const allFlows = this.extractFlowsFromDesign();
+      const targetFlow = allFlows.flows.find(flow => flow.id === flowId);
+
+      if (!targetFlow) {
+        logger.warn(MODULE_NAME, FUNC_NAME, `Flow ${flowId} not found`);
+        return null;
+      }
+
+      // Enhance the specific flow with additional details
+      const enhancedFlow = this.enhanceFlowWithDetailedAnalysis(targetFlow);
+
+      logger.info(MODULE_NAME, FUNC_NAME, 'Specific flow extraction complete', {
+        flowId: enhancedFlow.id,
+        screenCount: enhancedFlow.screens.length
+      });
+
+      return enhancedFlow;
+
+    } catch (error) {
+      ErrorHandler.handle(error as Error, {
+        module: MODULE_NAME,
+        function: FUNC_NAME,
+        operation: 'specific flow extraction',
+        additionalData: { flowId }
+      });
+      
+      return null;
+    }
+  }
+
+  @LogFunction(MODULE_NAME)
+  extractFlowAwareResults(): FlowAwareExtractionResult {
+    const FUNC_NAME = 'extractFlowAwareResults';
+    
+    try {
+      logger.info(MODULE_NAME, FUNC_NAME, 'Creating comprehensive flow-aware extraction result');
+
+      // Get base flow detection
+      const flowDetection = this.extractFlowsFromDesign();
+      
+      // Extract design values from all screens
+      const allScreens = [...flowDetection.flows.flatMap(f => f.screens), ...flowDetection.orphanedScreens];
+      const designValues = this.extractDesignValuesFromScreens(allScreens);
+
+      // Generate role-based design patterns
+      const uniqueRoles = this.extractUniqueRoles(flowDetection.flows);
+      const roleBasedPatterns = uniqueRoles.map(role => 
+        this.roleDetector.getRoleBasedDesignPattern(role)
+      );
+
+      // Calculate cross-flow consistency
+      const crossFlowConsistency = this.calculateCrossFlowConsistency(flowDetection.flows);
+
+      const result: FlowAwareExtractionResult = {
+        // Base extraction result properties
+        screens: allScreens.map(screen => ({
+          structure: screen,
+          code: '', // Will be generated on demand
+          componentCount: this.countComponents(screen),
+          semanticComponents: this.analyzeSemanticComponents(screen),
+          designPatterns: this.identifyScreenPatterns(screen)
+        })),
+        
+        // Flow-specific properties
+        flows: flowDetection.flows,
+        userRoles: uniqueRoles,
+        roleBasedPatterns,
+        flowDetection,
+        crossFlowConsistency
+      };
+
+      logger.info(MODULE_NAME, FUNC_NAME, 'Flow-aware extraction complete', {
+        totalFlows: result.flows.length,
+        totalRoles: result.userRoles.length,
+        consistencyScore: result.crossFlowConsistency.overallScore
+      });
+
+      return result;
+
+    } catch (error) {
+      ErrorHandler.handle(error as Error, {
+        module: MODULE_NAME,
+        function: FUNC_NAME,
+        operation: 'flow-aware extraction results generation'
+      });
+      
       throw error;
     }
   }
 
-  @LogFunction(MODULE_NAME)
-  private createNamingPatternStrategy(): FlowDetectionStrategy {
-    return {
-      name: 'NamingPattern',
-      confidence: 0.8,
-      detect: (screens: ScreenStructure[]): FlowGroup[] => {
-        const groups = new Map<string, ScreenStructure[]>();
-        
-        screens.forEach(screen => {
-          const groupKey = this.extractAdvancedGroupKey(screen.name);
-          if (!groups.has(groupKey)) {
-            groups.set(groupKey, []);
-          }
-          groups.get(groupKey)!.push(screen);
-        });
+  // Private helper methods
 
-        return Array.from(groups.entries())
-          .filter(([_, screenGroup]) => screenGroup.length > 1) // Only groups with multiple screens
-          .map(([groupKey, screenGroup]) => ({
-            id: `naming_${groupKey}`,
-            screens: this.sortScreensBySequence(screenGroup),
-            confidence: this.calculateNamingConfidence(groupKey, screenGroup),
-            detectionMethod: 'naming_pattern',
-            metadata: {
-              sequenceEvidence: this.extractSequenceEvidence(screenGroup)
-            }
-          }));
-      }
-    };
-  }
-
-  @LogFunction(MODULE_NAME)
-  private createPageStructureStrategy(): FlowDetectionStrategy {
-    return {
-      name: 'PageStructure',
-      confidence: 0.7,
-      detect: (screens: ScreenStructure[]): FlowGroup[] => {
-        const pageGroups = new Map<string, ScreenStructure[]>();
-        
-        screens.forEach(screen => {
-          const pageName = screen.page || 'Unknown Page';
-          if (!pageGroups.has(pageName)) {
-            pageGroups.set(pageName, []);
-          }
-          pageGroups.get(pageName)!.push(screen);
-        });
-
-        return Array.from(pageGroups.entries())
-          .filter(([_, screenGroup]) => screenGroup.length >= 2)
-          .map(([pageName, screenGroup]) => ({
-            id: `page_${pageName.replace(/\s+/g, '_').toLowerCase()}`,
-            screens: screenGroup,
-            confidence: this.calculatePageConfidence(pageName, screenGroup),
-            detectionMethod: 'page_structure',
-            metadata: {
-              flowType: this.inferFlowTypeFromPageName(pageName)
-            }
-          }));
-      }
-    };
-  }
-
-  @LogFunction(MODULE_NAME)
-  private createPrototypeLinkStrategy(): FlowDetectionStrategy {
-    return {
-      name: 'PrototypeLinks',
-      confidence: 0.9,
-      detect: (screens: ScreenStructure[]): FlowGroup[] => {
-        // Note: Figma API has limitations accessing prototype connections
-        // This is a foundation for when/if that becomes available
-        const connectedGroups: FlowGroup[] = [];
-        
-        try {
-          // Attempt to analyze prototype connections through spatial relationships
-          const spatiallyConnected = this.analyzePrototypeHints(screens);
-          
-          spatiallyConnected.forEach((group, index) => {
-            if (group.length > 1) {
-              connectedGroups.push({
-                id: `prototype_${index}`,
-                screens: group,
-                confidence: 0.85,
-                detectionMethod: 'prototype_analysis',
-                metadata: {
-                  navigationPattern: this.inferNavigationFromLayout(group)
-                }
-              });
-            }
-          });
-          
-        } catch (error) {
-          logger.debug(MODULE_NAME, 'createPrototypeLinkStrategy', 'Prototype analysis not available');
-        }
-        
-        return connectedGroups;
-      }
-    };
-  }
-
-  @LogFunction(MODULE_NAME)
-  private createSpatialProximityStrategy(): FlowDetectionStrategy {
-    return {
-      name: 'SpatialProximity',
-      confidence: 0.6,
-      detect: (screens: ScreenStructure[]): FlowGroup[] => {
-        const proximityGroups: FlowGroup[] = [];
-        const processed = new Set<string>();
-        
-        screens.forEach(screen => {
-          if (processed.has(screen.name)) return;
-          
-          const nearbyScreens = this.findNearbyScreens(screen, screens, 200); // 200px proximity
-          if (nearbyScreens.length > 1) {
-            proximityGroups.push({
-              id: `spatial_${screen.name}`,
-              screens: nearbyScreens,
-              confidence: this.calculateSpatialConfidence(nearbyScreens),
-              detectionMethod: 'spatial_proximity',
-              metadata: {
-                navigationPattern: this.inferNavigationFromSpatialLayout(nearbyScreens)
-              }
-            });
-            
-            nearbyScreens.forEach(s => processed.add(s.name));
-          }
-        });
-        
-        return proximityGroups;
-      }
-    };
-  }
-
-  @LogFunction(MODULE_NAME)
-  private createContentSimilarityStrategy(): FlowDetectionStrategy {
-    return {
-      name: 'ContentSimilarity',
-      confidence: 0.5,
-      detect: (screens: ScreenStructure[]): FlowGroup[] => {
-        const similarityGroups: FlowGroup[] = [];
-        const processed = new Set<string>();
-        
-        screens.forEach(screen => {
-          if (processed.has(screen.name)) return;
-          
-          const similarScreens = this.findSimilarContentScreens(screen, screens);
-          if (similarScreens.length > 1) {
-            similarityGroups.push({
-              id: `content_${screen.name}`,
-              screens: similarScreens,
-              confidence: this.calculateContentSimilarityConfidence(similarScreens),
-              detectionMethod: 'content_similarity',
-              metadata: {
-                flowType: this.inferFlowTypeFromContent(similarScreens)
-              }
-            });
-            
-            similarScreens.forEach(s => processed.add(s.name));
-          }
-        });
-        
-        return similarityGroups;
-      }
-    };
-  }
-
-  @LogFunction(MODULE_NAME)
-  private optimizeFlowGroups(allGroups: FlowGroup[], detectedRoles: UserRole[]): FlowGroup[] {
-    const FUNC_NAME = 'optimizeFlowGroups';
-    
+  private getAllNodesFromDesign(): any[] {
     try {
-      // Step 1: Remove duplicates and merge overlapping groups
-      const mergedGroups = this.mergeOverlappingGroups(allGroups);
-      
-      // Step 2: Filter by confidence threshold
-      const highConfidenceGroups = mergedGroups.filter(
-        group => group.confidence >= DETECTION_THRESHOLDS.flow.content_analysis
-      );
-      
-      // Step 3: Assign roles to groups
-      const roleAssignedGroups = this.assignRolesToGroups(highConfidenceGroups, detectedRoles);
-      
-      // Step 4: Sort by confidence and relevance
-      const sortedGroups = roleAssignedGroups.sort((a, b) => b.confidence - a.confidence);
-      
-      logger.debug(MODULE_NAME, FUNC_NAME, 'Flow group optimization complete', {
-        originalGroups: allGroups.length,
-        mergedGroups: mergedGroups.length,
-        highConfidenceGroups: highConfidenceGroups.length,
-        finalGroups: sortedGroups.length
+      const allPages = getAllPages();
+      let allNodes: any[] = [];
+
+      allPages.forEach(page => {
+        try {
+          const pageNodes = page.findAll();
+          allNodes = allNodes.concat(pageNodes);
+        } catch (pageError) {
+          logger.warn(MODULE_NAME, 'getAllNodesFromDesign', `Error getting nodes from page ${page.name}:`, { error: pageError });
+        }
       });
-      
-      return sortedGroups;
-      
+
+      return allNodes;
     } catch (error) {
-      logger.error(MODULE_NAME, FUNC_NAME, 'Error optimizing flow groups:', error as Error);
-      return allGroups.filter(group => group.confidence >= 0.5);
+      logger.error(MODULE_NAME, 'getAllNodesFromDesign', 'Error getting all nodes:', error as Error);
+      return [];
     }
   }
 
-  private extractAdvancedGroupKey(screenName: string): string {
-    const name = screenName.toLowerCase();
-    
-    // Advanced pattern matching with multiple strategies
-    
-    // Strategy 1: Role_Flow_Sequence (e.g., "Customer_Onboarding_01")
-    const roleFlowMatch = name.match(/^(customer|admin|operator|guest|user)[-_]([a-z]+)[-_]/);
-    if (roleFlowMatch) {
-      return `${roleFlowMatch[1]}_${roleFlowMatch[2]}`;
-    }
-    
-    // Strategy 2: Flow_Sequence (e.g., "Login_01", "Checkout_Step_1")
-    const flowMatch = name.match(/^([a-z]+)[-_](?:step[-_]?)?\d+/);
-    if (flowMatch) {
-      return flowMatch[1];
-    }
-    
-    // Strategy 3: Common prefix before separator (e.g., "Profile-Settings-1")
-    const prefixMatch = name.match(/^([a-z]+)[-_]/);
-    if (prefixMatch) {
-      return prefixMatch[1];
-    }
-    
-    // Strategy 4: Content-based grouping
-    for (const [flowType, patterns] of Object.entries(FLOW_PATTERNS.flowTypes)) {
-      if (patterns.some(pattern => name.includes(pattern))) {
-        return flowType;
-      }
-    }
-    
-    return 'misc';
-  }
-
-  private sortScreensBySequence(screens: ScreenStructure[]): ScreenStructure[] {
-    return screens.sort((a, b) => {
-      const aSequence = this.extractSequenceNumber(a.name);
-      const bSequence = this.extractSequenceNumber(b.name);
-      return aSequence - bSequence;
-    });
-  }
-
-  private extractSequenceNumber(screenName: string): number {
-    const name = screenName.toLowerCase();
-    
-    // Try different sequence patterns
-    const patterns = [
-      /[-_](\d+)$/, // ends with number
-      /step[-_]?(\d+)/,
-      /page[-_]?(\d+)/,
-      /screen[-_]?(\d+)/,
-      /(\d+)[-_]of[-_]\d+/,
-      /^(\d+)[-_]/ // starts with number
-    ];
-    
-    for (const pattern of patterns) {
-      const match = name.match(pattern);
-      if (match) {
-        return parseInt(match[1], 10);
-      }
-    }
-    
-    return 0; // Default sequence
-  }
-
-  private extractSequenceEvidence(screens: ScreenStructure[]): string[] {
-    const evidence: string[] = [];
-    
-    screens.forEach(screen => {
-      const name = screen.name.toLowerCase();
-      FLOW_PATTERNS.sequenceIndicators.forEach(pattern => {
-        const match = name.match(pattern);
-        if (match) {
-          evidence.push(`${screen.name}: ${match[0]}`);
-        }
-      });
-    });
-    
-    return evidence;
-  }
-
-  private calculateNamingConfidence(groupKey: string, screens: ScreenStructure[]): number {
-    let confidence = 0.5; // Base confidence
-    
-    // Boost for sequence indicators
-    const hasSequence = screens.some(screen => 
-      FLOW_PATTERNS.sequenceIndicators.some(pattern => pattern.test(screen.name))
-    );
-    if (hasSequence) confidence += 0.2;
-    
-    // Boost for role indicators
-    const hasRole = Object.values(FLOW_PATTERNS.userRoles).some(patterns =>
-      patterns.some(pattern => groupKey.includes(pattern))
-    );
-    if (hasRole) confidence += 0.2;
-    
-    // Boost for flow type indicators
-    const hasFlowType = Object.values(FLOW_PATTERNS.flowTypes).some(patterns =>
-      patterns.some(pattern => groupKey.includes(pattern))
-    );
-    if (hasFlowType) confidence += 0.1;
-    
-    return Math.min(confidence, 1.0);
-  }
-
-  private calculatePageConfidence(pageName: string, screens: ScreenStructure[]): number {
-    const name = pageName.toLowerCase();
-    let confidence = 0.4; // Base for page grouping
-    
-    // Higher confidence for meaningful page names
-    if (Object.values(FLOW_PATTERNS.flowTypes).some(patterns =>
-      patterns.some(pattern => name.includes(pattern))
-    )) {
-      confidence += 0.3;
-    }
-    
-    // Boost for consistent screen count
-    if (screens.length >= 3 && screens.length <= 8) {
-      confidence += 0.2;
-    }
-    
-    return Math.min(confidence, 1.0);
-  }
-
-  private findNearbyScreens(targetScreen: ScreenStructure, allScreens: ScreenStructure[], threshold: number): ScreenStructure[] {
-    const nearby = [targetScreen];
-    
-    allScreens.forEach(screen => {
-      if (screen.name === targetScreen.name) return;
-      
-      const distance = Math.sqrt(
-        Math.pow(screen.x - targetScreen.x, 2) + 
-        Math.pow(screen.y - targetScreen.y, 2)
-      );
-      
-      if (distance <= threshold) {
-        nearby.push(screen);
-      }
-    });
-    
-    return nearby;
-  }
-
-  private calculateSpatialConfidence(screens: ScreenStructure[]): number {
-    if (screens.length < 2) return 0;
-    
-    // Higher confidence for aligned screens (same Y or X coordinate)
-    const yCoords = screens.map(s => s.y);
-    const xCoords = screens.map(s => s.x);
-    
-    const alignedY = yCoords.every(y => Math.abs(y - yCoords[0]) < 50);
-    const alignedX = xCoords.every(x => Math.abs(x - xCoords[0]) < 50);
-    
-    let confidence = 0.3;
-    if (alignedY || alignedX) confidence += 0.3;
-    
-    return confidence;
-  }
-
-  private findSimilarContentScreens(targetScreen: ScreenStructure, allScreens: ScreenStructure[]): ScreenStructure[] {
-    const similar = [targetScreen];
-    const targetComponents = this.getComponentSignature(targetScreen);
-    
-    allScreens.forEach(screen => {
-      if (screen.name === targetScreen.name) return;
-      
-      const screenComponents = this.getComponentSignature(screen);
-      const similarity = this.calculateComponentSimilarity(targetComponents, screenComponents);
-      
-      if (similarity > 0.6) {
-        similar.push(screen);
-      }
-    });
-    
-    return similar;
-  }
-
-  private getComponentSignature(screen: ScreenStructure): string[] {
-    const signature: string[] = [];
-    
-    const collectComponents = (components: any[]) => {
-      components.forEach(comp => {
-        if (comp.semanticType) {
-          signature.push(comp.semanticType);
-        }
-        if (comp.children) {
-          collectComponents(comp.children);
-        }
-      });
-    };
-    
-    collectComponents(screen.components);
-    return signature;
-  }
-
-  private calculateComponentSimilarity(sig1: string[], sig2: string[]): number {
-    const set1 = new Set(sig1);
-    const set2 = new Set(sig2);
-    const intersection = new Set([...set1].filter(x => set2.has(x)));
-    const union = new Set([...set1, ...set2]);
-    
-    return union.size > 0 ? intersection.size / union.size : 0;
-  }
-
-  private calculateContentSimilarityConfidence(screens: ScreenStructure[]): number {
-    if (screens.length < 2) return 0;
-    
-    // Calculate average similarity between all pairs
-    let totalSimilarity = 0;
-    let pairCount = 0;
-    
-    for (let i = 0; i < screens.length; i++) {
-      for (let j = i + 1; j < screens.length; j++) {
-        const sig1 = this.getComponentSignature(screens[i]);
-        const sig2 = this.getComponentSignature(screens[j]);
-        totalSimilarity += this.calculateComponentSimilarity(sig1, sig2);
-        pairCount++;
-      }
-    }
-    
-    return pairCount > 0 ? totalSimilarity / pairCount : 0;
-  }
-
-  private mergeOverlappingGroups(groups: FlowGroup[]): FlowGroup[] {
-    const merged: FlowGroup[] = [];
-    const processed = new Set<string>();
-    
-    groups.forEach(group => {
-      if (processed.has(group.id)) return;
-      
-      const overlapping = groups.filter(otherGroup => 
-        otherGroup.id !== group.id && this.hasOverlappingScreens(group, otherGroup)
-      );
-      
-      if (overlapping.length > 0) {
-        // Merge groups
-        const allScreens = [group, ...overlapping].flatMap(g => g.screens);
-        const uniqueScreens = this.deduplicateScreens(allScreens);
-        const maxConfidence = Math.max(group.confidence, ...overlapping.map(g => g.confidence));
-        
-        merged.push({
-          id: `merged_${group.id}`,
-          screens: uniqueScreens,
-          confidence: maxConfidence,
-          detectionMethod: 'merged',
-          metadata: group.metadata
-        });
-        
-        overlapping.forEach(g => processed.add(g.id));
-      } else {
-        merged.push(group);
-      }
-      
-      processed.add(group.id);
-    });
-    
-    return merged;
-  }
-
-  private hasOverlappingScreens(group1: FlowGroup, group2: FlowGroup): boolean {
-    const names1 = new Set(group1.screens.map(s => s.name));
-    const names2 = new Set(group2.screens.map(s => s.name));
-    
-    for (const name of names1) {
-      if (names2.has(name)) return true;
-    }
-    return false;
-  }
-
-  private deduplicateScreens(screens: ScreenStructure[]): ScreenStructure[] {
-    const seen = new Set<string>();
-    return screens.filter(screen => {
-      if (seen.has(screen.name)) return false;
-      seen.add(screen.name);
-      return true;
-    });
-  }
-
-  private assignRolesToGroups(groups: FlowGroup[], detectedRoles: UserRole[]): FlowGroup[] {
-    return groups.map(group => {
-      if (group.metadata.role) return group;
-      
-      // Try to match group with detected roles
-      const screenNames = group.screens.map(s => s.name.toLowerCase()).join(' ');
-      
-      for (const role of detectedRoles) {
-        const rolePatterns = FLOW_PATTERNS.userRoles[role.type] || [];
-        if (rolePatterns.some(pattern => screenNames.includes(pattern))) {
-          group.metadata.role = role;
-          break;
-        }
-      }
-      
-      return group;
-    });
-  }
-
-  private convertToFlowStructures(groups: FlowGroup[]): FlowStructure[] {
-    return groups.map((group, index) => ({
-      id: group.id,
-      name: this.generateFlowName(group),
-      userRole: group.metadata.role || this.createDefaultRole(),
-      screens: group.screens,
-      flowType: this.determineFlowType(group),
-      navigationPattern: this.determineNavigationPattern(group),
-      deviceTargets: this.determineDeviceTargets(group.screens),
-      sequence: index + 1
+  private enhanceFlowsWithMetadata(flows: FlowStructure[]): FlowStructure[] {
+    return flows.map(flow => ({
+      ...flow,
+      estimatedDuration: this.calculateFlowDuration(flow),
+      criticalPath: this.isFlowOnCriticalPath(flow),
+      subFlows: this.identifySubFlows(flow),
+      parentFlow: this.findParentFlow(flow, flows)
     }));
   }
 
-  private generateFlowName(group: FlowGroup): string {
-    const role = group.metadata.role?.name || 'User';
-    const flowType = group.metadata.flowType || this.inferFlowTypeFromScreens(group.screens);
-    return `${role} ${flowType}`;
-  }
-
-  private createDefaultRole(): UserRole {
+  private enhanceFlowWithDetailedAnalysis(flow: FlowStructure): FlowStructure {
     return {
-      id: 'default_customer',
-      name: 'Customer',
-      type: 'customer',
-      confidence: 0.5,
-      detectionSource: 'content_analysis'
+      ...flow,
+      estimatedDuration: this.calculateFlowDuration(flow),
+      criticalPath: this.isFlowOnCriticalPath(flow),
+      // Add detailed navigation analysis
+      screens: flow.screens.map((screen, index) => ({
+        ...screen,
+        sequenceInFlow: index + 1,
+        navigationTo: this.getNavigationTargets(screen, flow),
+        navigationFrom: this.getNavigationSources(screen, flow),
+        flowStage: this.determineFlowStage(index, flow.screens.length),
+        userIntent: this.inferUserIntent(screen, flow.flowType),
+        criticalPath: this.isScreenOnCriticalPath(screen, flow)
+      }))
     };
   }
 
-  private determineFlowType(group: FlowGroup): FlowStructure['flowType'] {
-    if (group.metadata.flowType) {
-      return group.metadata.flowType as FlowStructure['flowType'];
-    }
-    return this.inferFlowTypeFromScreens(group.screens);
+  private calculateFlowDuration(flow: FlowStructure): number {
+    // Estimate based on flow type and screen count
+    const baseTime = {
+      onboarding: 60, // 1 minute per screen
+      authentication: 30, // 30 seconds per screen
+      main_feature: 90, // 1.5 minutes per screen
+      settings: 45, // 45 seconds per screen
+      checkout: 120, // 2 minutes per screen
+      unknown: 60
+    };
+
+    const timePerScreen = baseTime[flow.flowType] || 60;
+    return flow.screens.length * timePerScreen;
   }
 
-  private determineNavigationPattern(group: FlowGroup): FlowStructure['navigationPattern'] {
-    if (group.metadata.navigationPattern) {
-      return group.metadata.navigationPattern as FlowStructure['navigationPattern'];
-    }
-    
-    const screenCount = group.screens.length;
-    if (screenCount <= 2) return 'modal';
-    if (screenCount <= 5) return 'tab';
-    return 'stack';
+  private isFlowOnCriticalPath(flow: FlowStructure): boolean {
+    // Critical flows are typically onboarding, authentication, and main features
+    return ['onboarding', 'authentication', 'main_feature'].includes(flow.flowType);
   }
 
-  private determineDeviceTargets(screens: ScreenStructure[]): ('mobile' | 'tablet' | 'desktop')[] {
-    const targets = new Set<'mobile' | 'tablet' | 'desktop'>();
-    screens.forEach(screen => {
-      if (screen.deviceType) {
-        targets.add(screen.deviceType as 'mobile' | 'tablet' | 'desktop');
-      }
-    });
-    return Array.from(targets);
-  }
-
-  // Additional helper methods...
-  private analyzePrototypeHints(screens: ScreenStructure[]): ScreenStructure[][] {
-    // Placeholder for prototype connection analysis
+  private identifySubFlows(flow: FlowStructure): string[] {
+    // Look for logical sub-groupings within the flow
+    // This is a simplified implementation
     return [];
   }
 
-  private inferNavigationFromLayout(screens: ScreenStructure[]): string {
-    return 'stack'; // Simplified for now
+  private findParentFlow(flow: FlowStructure, allFlows: FlowStructure[]): string | undefined {
+    // Check if this flow is a sub-flow of another
+    // This is a simplified implementation
+    return undefined;
   }
 
-  private inferNavigationFromSpatialLayout(screens: ScreenStructure[]): string {
-    return 'spatial'; // Simplified for now
-  }
-
-  private inferFlowTypeFromPageName(pageName: string): string {
-    const name = pageName.toLowerCase();
-    for (const [flowType, patterns] of Object.entries(FLOW_PATTERNS.flowTypes)) {
-      if (patterns.some(pattern => name.includes(pattern))) {
-        return flowType;
-      }
-    }
-    return 'unknown';
-  }
-
-  private inferFlowTypeFromContent(screens: ScreenStructure[]): string {
-    return 'unknown'; // Simplified for now
-  }
-
-  private inferFlowTypeFromScreens(screens: ScreenStructure[]): string {
-    const combinedNames = screens.map(s => s.name.toLowerCase()).join(' ');
-    for (const [flowType, patterns] of Object.entries(FLOW_PATTERNS.flowTypes)) {
-      if (patterns.some(pattern => combinedNames.includes(pattern))) {
-        return flowType;
-      }
-    }
-    return 'main_feature';
-  }
-
-  private calculateRoleDistribution(roles: UserRole[]): Record<string, number> {
-    const distribution: Record<string, number> = {};
-    roles.forEach(role => {
-      distribution[role.type] = (distribution[role.type] || 0) + 1;
-    });
-    return distribution;
-  }
-
-  private calculateFlowTypeDistribution(flows: FlowStructure[]): Record<string, number> {
-    const distribution: Record<string, number> = {};
-    flows.forEach(flow => {
-      distribution[flow.flowType] = (distribution[flow.flowType] || 0) + 1;
-    });
-    return distribution;
-  }
-
-  private calculateDetectionQuality(allScreens: ScreenStructure[], flows: FlowStructure[]): FlowDetectionResult['detectionQuality'] {
-    const screensInFlows = flows.reduce((sum, flow) => sum + flow.screens.length, 0);
-    const averageFlowLength = flows.length > 0 ? screensInFlows / flows.length : 0;
-    const roleDetectionAccuracy = flows.filter(flow => flow.userRole.confidence > DETECTION_THRESHOLDS.role.medium_confidence).length / Math.max(flows.length, 1);
+  private extractUniqueRoles(flows: FlowStructure[]): UserRole[] {
+    const roleMap = new Map<string, UserRole>();
     
+    flows.forEach(flow => {
+      if (flow.userRole && !roleMap.has(flow.userRole.type)) {
+        roleMap.set(flow.userRole.type, flow.userRole);
+      }
+    });
+
+    return Array.from(roleMap.values());
+  }
+
+  private calculateCrossFlowConsistency(flows: FlowStructure[]): any {
+    // Analyze consistency across flows
+    const allComponents = flows.flatMap(flow => 
+      flow.screens.flatMap(screen => screen.components)
+    );
+
+    const componentTypes = new Set(allComponents.map(c => c.semanticType));
+    const sharedComponents = Array.from(componentTypes).filter(type =>
+      flows.filter(flow => 
+        flow.screens.some(screen => 
+          screen.components.some(c => c.semanticType === type)
+        )
+      ).length > 1
+    );
+
     return {
-      totalScreens: allScreens.length,
-      screensInFlows,
-      averageFlowLength: Math.round(averageFlowLength * 10) / 10,
-      roleDetectionAccuracy: Math.round(roleDetectionAccuracy * 100) / 100
+      sharedComponents: sharedComponents.length,
+      consistentStyling: this.calculateStylingConsistency(allComponents),
+      navigationPatterns: this.calculateNavigationConsistency(flows),
+      overallScore: Math.min(100, (sharedComponents.length / Math.max(componentTypes.size, 1)) * 100)
     };
   }
 
-  private generateAdvancedRecommendations(flows: FlowStructure[], orphanedScreens: ScreenStructure[], allGroups: FlowGroup[]): string[] {
-    const recommendations: string[] = [];
-    
-    // Analysis of detection strategies
-    const strategyResults = new Map<string, number>();
-    allGroups.forEach(group => {
-      strategyResults.set(group.detectionMethod, (strategyResults.get(group.detectionMethod) || 0) + 1);
+  private extractDesignValuesFromScreens(screens: ScreenStructure[]): any {
+    // Extract design values from all screens
+    const values = {
+      colors: new Set<string>(),
+      fontSizes: new Set<number>(),
+      fontWeights: new Set<string>(),
+      fontFamilies: new Set<string>(),
+      borderRadius: new Set<number>(),
+      spacing: new Set<number>(),
+      shadows: new Set<string>(),
+      opacity: new Set<number>(),
+      buttons: [] as any[],
+      inputs: [] as any[],
+      headings: [] as any[],
+      labels: [] as any[],
+      cards: [] as any[],
+      navigationItems: [] as any[]
+    };
+
+    screens.forEach(screen => {
+      this.extractValuesFromComponents(screen.components, values);
     });
+
+    return values;
+  }
+
+  private extractValuesFromComponents(components: any[], values: any): void {
+    components.forEach(component => {
+      // Extract basic values
+      if (component.backgroundColor) values.colors.add(component.backgroundColor);
+      if (component.textColor) values.colors.add(component.textColor);
+      if (component.fontSize) values.fontSizes.add(component.fontSize);
+      if (component.fontWeight) values.fontWeights.add(component.fontWeight);
+      if (component.borderRadius) values.borderRadius.add(component.borderRadius);
+
+      // Categorize components
+      switch (component.semanticType) {
+        case 'button':
+          values.buttons.push(component);
+          break;
+        case 'input':
+          values.inputs.push(component);
+          break;
+        case 'heading':
+          values.headings.push(component);
+          break;
+        case 'label':
+          values.labels.push(component);
+          break;
+        case 'card':
+          values.cards.push(component);
+          break;
+        case 'navigation':
+          values.navigationItems.push(component);
+          break;
+      }
+
+      // Process children
+      if (component.children) {
+        this.extractValuesFromComponents(component.children, values);
+      }
+    });
+  }
+
+  private countComponents(screen: ScreenStructure): number {
+    const countRecursive = (components: any[]): number => {
+      let count = components.length;
+      components.forEach(component => {
+        if (component.children) {
+          count += countRecursive(component.children);
+        }
+      });
+      return count;
+    };
+
+    return countRecursive(screen.components);
+  }
+
+  private analyzeSemanticComponents(screen: ScreenStructure): Record<string, number> {
+    const analysis: Record<string, number> = {};
     
-    if (strategyResults.get('naming_pattern') === 0) {
-      recommendations.push('No naming patterns detected. Use consistent naming like "UserType_FlowName_SequenceNumber" for better flow detection.');
+    const analyzeRecursive = (components: any[]) => {
+      components.forEach(component => {
+        const type = component.semanticType || 'unknown';
+        analysis[type] = (analysis[type] || 0) + 1;
+        
+        if (component.children) {
+          analyzeRecursive(component.children);
+        }
+      });
+    };
+
+    analyzeRecursive(screen.components);
+    return analysis;
+  }
+
+  private identifyScreenPatterns(screen: ScreenStructure): string[] {
+    const patterns: string[] = [];
+    const semanticTypes = new Set<string>();
+    
+    const collectTypes = (components: any[]) => {
+      components.forEach(component => {
+        if (component.semanticType) {
+          semanticTypes.add(component.semanticType);
+        }
+        if (component.children) {
+          collectTypes(component.children);
+        }
+      });
+    };
+
+    collectTypes(screen.components);
+
+    // Identify patterns based on component combinations
+    if (semanticTypes.has('navigation')) patterns.push('Navigation Pattern');
+    if (semanticTypes.has('card')) patterns.push('Card Layout');
+    if (semanticTypes.has('input') && semanticTypes.has('button')) patterns.push('Form Pattern');
+    if (semanticTypes.has('heading') && semanticTypes.has('text')) patterns.push('Content Display');
+
+    return patterns;
+  }
+
+  private createEmptyFlowResult(): FlowDetectionResult {
+    return {
+      flows: [],
+      orphanedScreens: [],
+      roleDistribution: {},
+      flowTypeDistribution: {},
+      detectionQuality: {
+        totalScreens: 0,
+        screensInFlows: 0,
+        averageFlowLength: 0,
+        roleDetectionAccuracy: 0
+      },
+      recommendations: [
+        'No flows detected. Try using consistent naming conventions like "UserRole_FlowName_SequenceNumber"',
+        'Organize related screens in folders or pages',
+        'Use clear, descriptive names for your frames'
+      ]
+    };
+  }
+
+  private generateFlowExtractorRecommendations(flows: FlowStructure[], allScreens: ScreenStructure[]): string[] {
+    const recommendations: string[] = [];
+
+    if (flows.length === 0) {
+      recommendations.push('Consider organizing your screens into logical user flows');
     }
-    
-    if (orphanedScreens.length > flows.length) {
-      recommendations.push(`${orphanedScreens.length} screens are not grouped into flows. Consider organizing them into clear user journeys.`);
+
+    const orphanedCount = allScreens.length - flows.reduce((sum, flow) => sum + flow.screens.length, 0);
+    if (orphanedCount > flows.length) {
+      recommendations.push(`${orphanedCount} screens are not organized into flows - consider grouping them`);
     }
+
+    const rolesWithoutFlows = flows.length > 0 ? 
+      ['customer', 'admin', 'operator'].filter(role => 
+        !flows.some(flow => flow.userRole.type === role)
+      ) : [];
     
-    const avgFlowLength = flows.reduce((sum, flow) => sum + flow.screens.length, 0) / flows.length;
-    if (avgFlowLength < 2) {
-      recommendations.push('Most flows have very few screens. Consider grouping related screens into longer user journeys.');
+    if (rolesWithoutFlows.length > 0) {
+      recommendations.push(`Consider creating flows for: ${rolesWithoutFlows.join(', ')}`);
     }
-    
-    if (avgFlowLength > 8) {
-      recommendations.push('Some flows are very long. Consider breaking them into sub-flows for better user experience.');
-    }
-    
+
     return recommendations;
   }
 
-  private calculateAverageConfidence(groups: FlowGroup[]): number {
-    if (groups.length === 0) return 0;
-    return groups.reduce((sum, group) => sum + group.confidence, 0) / groups.length;
+  // Additional helper methods for detailed analysis
+  private getNavigationTargets(screen: ScreenStructure, flow: FlowStructure): string[] {
+    // Simplified - in a real implementation, this would analyze prototype connections
+    const currentIndex = flow.screens.findIndex(s => s.name === screen.name);
+    if (currentIndex < flow.screens.length - 1) {
+      return [flow.screens[currentIndex + 1].name];
+    }
+    return [];
+  }
+
+  private getNavigationSources(screen: ScreenStructure, flow: FlowStructure): string[] {
+    const currentIndex = flow.screens.findIndex(s => s.name === screen.name);
+    if (currentIndex > 0) {
+      return [flow.screens[currentIndex - 1].name];
+    }
+    return [];
+  }
+
+  private determineFlowStage(index: number, totalScreens: number): 'entry' | 'middle' | 'exit' | 'standalone' {
+    if (totalScreens === 1) return 'standalone';
+    if (index === 0) return 'entry';
+    if (index === totalScreens - 1) return 'exit';
+    return 'middle';
+  }
+
+  private inferUserIntent(screen: ScreenStructure, flowType: string): string {
+    const intentMap: Record<string, string> = {
+      onboarding: 'Learn and get started',
+      authentication: 'Sign in or register',
+      main_feature: 'Use primary functionality',
+      settings: 'Configure preferences',
+      checkout: 'Complete purchase',
+      unknown: 'Complete task'
+    };
+
+    return intentMap[flowType] || 'Navigate and interact';
+  }
+
+  private isScreenOnCriticalPath(screen: ScreenStructure, flow: FlowStructure): boolean {
+    // Screens on critical flows are generally on critical path
+    return flow.criticalPath || false;
+  }
+
+  private calculateStylingConsistency(components: any[]): number {
+    // Simplified consistency calculation
+    const colors = new Set(components.map(c => c.backgroundColor).filter(Boolean));
+    const fontSizes = new Set(components.map(c => c.fontSize).filter(Boolean));
+    
+    // Lower variation indicates higher consistency
+    const colorConsistency = Math.max(0, 1 - (colors.size / Math.max(components.length, 1)));
+    const fontConsistency = Math.max(0, 1 - (fontSizes.size / Math.max(components.length, 1)));
+    
+    return (colorConsistency + fontConsistency) / 2 * 100;
+  }
+
+  private calculateNavigationConsistency(flows: FlowStructure[]): number {
+    // Check if flows use consistent navigation patterns
+    const patterns = flows.map(flow => flow.navigationPattern);
+    const uniquePatterns = new Set(patterns);
+    
+    return Math.max(0, 1 - (uniquePatterns.size / Math.max(flows.length, 1))) * 100;
   }
 }
 
-export default FlowDetector;
+export default FlowExtractor;
