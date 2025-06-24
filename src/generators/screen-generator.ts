@@ -248,7 +248,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');`;
   }
 
   @LogFunction(MODULE_NAME)
-  generateSemanticJSX(components: ComponentStructure[], theme: ThemeTokens, flowContext?: any, depth: number = 2): string {
+  private generateSemanticJSX(components: ComponentStructure[], theme: ThemeTokens, flowContext?: any, depth: number = 2): string {
     const indent = '  '.repeat(depth);
     
     return components.map((component: ComponentStructure) => {
@@ -318,8 +318,7 @@ ${indent}  activeOpacity={0.7}
 ${indent}  testID="${styleName}-button"
 ${indent}>
 ${indent}  <Text style={styles.buttonText}>
-${indent}    {/* ${buttonText} */}
-${indent}    ${buttonText}
+${indent}    {buttonText}
 ${indent}  </Text>
 ${indent}</TouchableOpacity>`;
   }
@@ -343,8 +342,7 @@ ${indent}/>`;
     const text = component.text || 'Heading';
     
     return `${indent}<Text style={[styles.heading, styles.h${level}, styles.${this.sanitizeStyleName(component.name)}]}>
-${indent}  {/* ${text} */}
-${indent}  ${text}
+${indent}  {text}
 ${indent}</Text>`;
   }
 
@@ -353,8 +351,7 @@ ${indent}</Text>`;
     const styleName = this.sanitizeStyleName(component.name);
     
     return `${indent}<Text style={[styles.text, styles.${component.semanticType || 'text'}, styles.${styleName}]}>
-${indent}  {/* ${text} */}
-${indent}  ${text}
+${indent}  {text}
 ${indent}</Text>`;
   }
 
@@ -379,7 +376,7 @@ ${indent}</Text>`;
     if (component.children && component.children.length > 0) {
       jsx += '\n' + this.generateSemanticJSX(component.children, theme, flowContext, depth + 1);
     } else {
-      jsx += `\n${indent}  <Text style={styles.navTitle}>${component.name || 'Navigation'}</Text>`;
+      jsx += `\n${indent}  <Text style={styles.navTitle}>{component.name || 'Navigation'}</Text>`;
     }
     
     jsx += `\n${indent}</View>`;
@@ -413,7 +410,7 @@ ${indent}/>`;
     return `${indent}<View style={styles.fallbackContainer}>
 ${indent}  <Text style={styles.fallbackText}>
 ${indent}    {/* Error rendering ${component.name} */}
-${indent}    Component: ${component.name}
+${indent}    Component: {component.name}
 ${indent}  </Text>
 ${indent}</View>`;
   }
@@ -423,7 +420,7 @@ ${indent}</View>`;
     const safeAreaStyle = screenStructure.deviceType === 'mobile' ? `
   safeArea: {
     flex: 1,
-    backgroundColor: '${screenStructure.backgroundColor || theme.colors?.background || '#FFFFFF'}',
+    backgroundColor: '${this.getBackgroundColor(screenStructure, theme)}',
   },` : '';
 
     const scrollStyles = this.needsScrollView(screenStructure) ? `
@@ -438,7 +435,7 @@ ${indent}</View>`;
     return `const styles = StyleSheet.create({${safeAreaStyle}
   container: {
     flex: 1,
-    backgroundColor: '${screenStructure.backgroundColor || theme.colors?.background || '#FFFFFF'}',
+    backgroundColor: '${this.getBackgroundColor(screenStructure, theme)}',
   },
   content: {
     flex: 1,
@@ -554,7 +551,7 @@ ${componentStyles}
   }
 
   @LogFunction(MODULE_NAME)
-  generateComponentStyles(components: ComponentStructure[], theme: ThemeTokens): string {
+  private generateComponentStyles(components: ComponentStructure[], theme: ThemeTokens): string {
     const styles: string[] = [];
     
     try {
@@ -784,6 +781,10 @@ Design System Analysis:
            screenStructure.layoutType === 'column';
   }
 
+  private getBackgroundColor(screenStructure: ScreenStructure, theme: ThemeTokens): string {
+    return screenStructure.backgroundColor || theme.colors?.background || '#FFFFFF';
+  }
+
   private generateMinimalScreenCode(screenStructure: ScreenStructure): string {
     const componentName = sanitizeName(screenStructure.name).replace(/^./, (char) => char.toUpperCase()) || 'Screen';
     
@@ -799,12 +800,12 @@ interface ${componentName}Props {
 const ${componentName}: React.FC<${componentName}Props> = ({ navigation }) => {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>${screenStructure.name}</Text>
+      <Text style={styles.title}>{screenStructure.name}</Text>
       <Text style={styles.subtitle}>
-        ${screenStructure.width} × ${screenStructure.height}px
+        {screenStructure.width} × {screenStructure.height}px
       </Text>
       <Text style={styles.info}>
-        Device: ${screenStructure.deviceType} • Layout: ${screenStructure.layoutType}
+        Device: {screenStructure.deviceType} • Layout: {screenStructure.layoutType}
       </Text>
     </View>
   );
