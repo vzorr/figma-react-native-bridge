@@ -447,6 +447,16 @@ export default class ExtractScreensHandler {
     // Generate styles based on actual components
     const componentStyles = this.generateComponentStyles(screenStructure.components, theme);
     
+    const backgroundColor = screenStructure.backgroundColor || '#FFFFFF';
+    const safeAreaBg = theme.colors?.white || '#FFFFFF';
+    const primaryColor = theme.colors?.primary || '#007AFF';
+    const grayColor = theme.colors?.gray3 || '#E1E5E9';
+    const darkColor = theme.colors?.dark1 || '#1A1A1A';
+    const textColor = theme.colors?.dark2 || '#333333';
+    const labelColor = theme.colors?.dark3 || '#666666';
+    const secondaryColor = theme.colors?.secondary || '#6C757D';
+    const lightGrayColor = theme.colors?.gray2 || '#F1F3F4';
+    
     return `// ${componentName}.tsx - Generated from Figma
 // Screen: ${screenStructure.name}${screenStructure.page ? ` (${screenStructure.page})` : ''}
 // Device: ${screenStructure.deviceType} • Layout: ${screenStructure.layoutType}
@@ -458,7 +468,6 @@ import {
   ${imports.join(',\n  ')},
   Dimensions,
 } from 'react-native';
-import theme from '../theme';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -483,11 +492,11 @@ ${componentsJSX}
 const styles = StyleSheet.create({
   ${screenStructure.deviceType === 'mobile' ? `safeArea: {
     flex: 1,
-    backgroundColor: '${screenStructure.backgroundColor || theme.colors?.white || '#FFFFFF'}',
+    backgroundColor: '${safeAreaBg}',
   },` : ''}
   screen: {
     flex: 1,
-    backgroundColor: '${screenStructure.backgroundColor || theme.colors?.white || '#FFFFFF'}',
+    backgroundColor: '${backgroundColor}',
   },
   content: {
     width: ${screenStructure.width},
@@ -500,7 +509,7 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   button: {
-    backgroundColor: '${theme.colors?.primary || '#007AFF'}',
+    backgroundColor: '${primaryColor}',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
@@ -516,7 +525,7 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '${theme.colors?.gray3 || '#E1E5E9'}',
+    borderColor: '${grayColor}',
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -525,7 +534,7 @@ const styles = StyleSheet.create({
   },
   heading: {
     fontWeight: '600',
-    color: '${theme.colors?.dark1 || '#1A1A1A'}',
+    color: '${darkColor}',
     marginVertical: 8,
   },
   h1: { fontSize: 32, fontWeight: '700' },
@@ -533,13 +542,13 @@ const styles = StyleSheet.create({
   h3: { fontSize: 20, fontWeight: '600' },
   text: {
     fontSize: 16,
-    color: '${theme.colors?.dark2 || '#333333'}',
+    color: '${textColor}',
     lineHeight: 24,
     marginVertical: 2,
   },
   label: {
     fontSize: 14,
-    color: '${theme.colors?.dark3 || '#666666'}',
+    color: '${labelColor}',
     marginVertical: 2,
   },
   card: {
@@ -561,12 +570,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 1,
-    borderBottomColor: '${theme.colors?.gray2 || '#F1F3F4'}',
+    borderBottomColor: '${lightGrayColor}',
   },
   placeholder: {
     fontSize: 18,
     fontWeight: '500',
-    color: '${theme.colors?.secondary || '#6C757D'}',
+    color: '${secondaryColor}',
     textAlign: 'center',
     padding: 32,
   },

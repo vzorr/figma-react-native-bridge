@@ -190,9 +190,10 @@ export const BUILD_INFO = {
 export const ENVIRONMENT = {
   isDevelopment: (() => {
     try {
-      // Check if we're in development by looking for webpack dev indicators
-      return typeof __webpack_require__ !== 'undefined' && 
-             (typeof module !== 'undefined' && module.hot);
+      // Check if we're in development by looking for webpack dev features
+      // Use typeof check to avoid undefined variable errors
+      return typeof module !== 'undefined' && 
+             (module as any).hot !== undefined;
     } catch {
       return false;
     }
@@ -200,9 +201,9 @@ export const ENVIRONMENT = {
   
   isProduction: (() => {
     try {
-      // In production, code is typically minified
-      return typeof __webpack_require__ !== 'undefined' && 
-             !module?.hot;
+      // In production, hot module replacement is typically not available
+      return typeof module === 'undefined' || 
+             (module as any).hot === undefined;
     } catch {
       return true; // Default to production for safety
     }

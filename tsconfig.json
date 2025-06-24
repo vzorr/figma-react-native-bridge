@@ -39,7 +39,7 @@
       "@handlers/*": ["handlers/*"],
       "@types/*": ["types/*"]
     },
-    "types": ["figma", "node", "jest"],
+    "types": ["figma", "node"],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": [
