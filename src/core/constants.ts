@@ -137,8 +137,9 @@ export const REACT_NATIVE_COMPONENTS = {
 } as const;
 
 export const MESSAGE_TYPES = {
-  // From UI to Plugin
+  // From UI to Plugin (both formats)
   EXTRACT_VALUES: 'extract-values',
+  EXTRACT_TOKENS: 'extract-tokens', // UI format
   EXTRACT_SCREENS: 'extract-screens',
   CLOSE: 'close',
   GET_LOGS: 'get-logs',
@@ -146,8 +147,11 @@ export const MESSAGE_TYPES = {
   SET_LOG_LEVEL: 'set-log-level',
   
   // From Plugin to UI
+  PLUGIN_READY: 'plugin-ready',
   PROGRESS_UPDATE: 'progress-update',
+  PROGRESS: 'progress', // UI format
   EXTRACTION_COMPLETE: 'extraction-complete',
+  TOKENS_EXTRACTED: 'tokens-extracted', // UI format
   SCREENS_EXTRACTED: 'screens-extracted',
   EXTRACTION_ERROR: 'extraction-error',
   ERROR: 'error',
@@ -213,6 +217,16 @@ export const ENVIRONMENT = {
   })()
 } as const;
 
+// UI Message mapping for backwards compatibility
+export const UI_MESSAGE_MAP = {
+  'extract-tokens': MESSAGE_TYPES.EXTRACT_VALUES,
+  'extract-screens': MESSAGE_TYPES.EXTRACT_SCREENS,
+  'close': MESSAGE_TYPES.CLOSE,
+  'get-logs': MESSAGE_TYPES.GET_LOGS,
+  'clear-logs': MESSAGE_TYPES.CLEAR_LOGS,
+  'set-log-level': MESSAGE_TYPES.SET_LOG_LEVEL
+} as const;
+
 export default {
   PLUGIN_CONFIG,
   EXTRACTION_LIMITS,
@@ -223,6 +237,7 @@ export default {
   FONT_WEIGHT_MAPPINGS,
   REACT_NATIVE_COMPONENTS,
   MESSAGE_TYPES,
+  UI_MESSAGE_MAP,
   LOG_LEVELS,
   ERROR_SEVERITIES,
   BUILD_INFO,

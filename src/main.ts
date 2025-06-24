@@ -5,7 +5,7 @@ import { logger, LogLevel } from './core/logger';
 import { ErrorHandler } from './core/error-handler';
 import { MESSAGE_TYPES } from './core/constants';
 import { ExtractValuesHandler } from './handlers/extract-values-handler';
-import { ExtractScreensHandler } from './handlers/extract-screens-handler';
+import ExtractScreensHandler from './handlers/extract-screens-handler'; // Default import
 
 declare const figma: any;
 declare const __html__: string;
@@ -46,6 +46,7 @@ class FigmaReactNativeBridge {
 
       // Set up message handling
       figma.ui.onmessage = (msg: any) => {
+        this.incrementMessageCount();
         this.handleMessage(msg).catch((error) => {
           ErrorHandler.handle(error as Error, {
             module: MODULE_NAME,
@@ -70,25 +71,33 @@ class FigmaReactNativeBridge {
     try {
       logger.info(MODULE_NAME, 'handleMessage', `Received message: ${msg.type}`);
       
-      switch (msg.type) {
+      // Handle UI message format (from the HTML file)
+      const messageType = msg.type || msg.pluginMessage?.type;
+      
+      switch (messageType) {
         case MESSAGE_TYPES.EXTRACT_VALUES:
+        case 'extract-tokens': // Handle UI message format
           await this.extractValuesHandler.handle(msg.options);
           break;
           
         case MESSAGE_TYPES.EXTRACT_SCREENS:
+        case 'extract-screens': // Handle UI message format
           await this.extractScreensHandler.handle(msg.options);
           break;
           
         case MESSAGE_TYPES.CLOSE:
+        case 'close':
           logger.info(MODULE_NAME, 'handleMessage', 'Closing plugin');
           figma.closePlugin();
           break;
           
         case MESSAGE_TYPES.GET_LOGS:
+        case 'get-logs':
           this.sendLogs();
           break;
           
         case MESSAGE_TYPES.CLEAR_LOGS:
+        case 'clear-logs':
           logger.clearLogs();
           figma.ui.postMessage({
             type: MESSAGE_TYPES.LOGS_CLEARED
@@ -96,6 +105,7 @@ class FigmaReactNativeBridge {
           break;
           
         case MESSAGE_TYPES.SET_LOG_LEVEL:
+        case 'set-log-level':
           if (msg.level !== undefined) {
             logger.setLevel(msg.level as LogLevel);
             figma.ui.postMessage({
@@ -106,7 +116,7 @@ class FigmaReactNativeBridge {
           break;
           
         default:
-          logger.warn(MODULE_NAME, 'handleMessage', `Unknown message type: ${msg.type}`);
+          logger.warn(MODULE_NAME, 'handleMessage', `Unknown message type: ${messageType}`);
       }
     } catch (error) {
       ErrorHandler.handle(error as Error, {
@@ -178,13 +188,27 @@ class FigmaReactNativeBridge {
 
   private incrementMessageCount(): void {
     this.messageCount++;
+    logger.debug(MODULE_NAME, 'incrementMessageCount', `Message count: ${this.messageCount}`);
+  }
+
+  // Cleanup method
+  destroy(): void {
+    try {
+      this.sendFinalLogs();
+      logger.info(MODULE_NAME, 'destroy', 'Plugin cleanup complete');
+    } catch (error) {
+      console.error('Error during plugin cleanup:', error);
+    }
   }
 }
+
+// Global instance for cleanup
+let bridgeInstance: FigmaReactNativeBridge | null = null;
 
 // Error boundary for the entire plugin
 function initializePluginWithErrorHandling(): void {
   try {
-    // Set up global error handling
+    // Set up global error handling only if window is available (not in Figma sandbox)
     if (typeof window !== 'undefined') {
       window.addEventListener('error', (event) => {
         ErrorHandler.handle(event.error, {
@@ -208,13 +232,41 @@ function initializePluginWithErrorHandling(): void {
           additionalData: { reason: event.reason }
         });
       });
+
+      // Cleanup on window unload
+      window.addEventListener('beforeunload', () => {
+        if (bridgeInstance) {
+          bridgeInstance.destroy();
+        }
+      });
     }
 
     // Initialize and start the plugin
-    const bridge = new FigmaReactNativeBridge();
-    bridge.init();
+    bridgeInstance = new FigmaReactNativeBridge();
+    bridgeInstance.init();
     
     logger.info(MODULE_NAME, 'initializePluginWithErrorHandling', 'Plugin successfully loaded');
+    
+    // Send initial status to UI
+    setTimeout(() => {
+      try {
+        figma.ui.postMessage({
+          type: 'plugin-ready',
+          data: {
+            version: '1.0.0',
+            timestamp: Date.now(),
+            capabilities: [
+              'extract-tokens',
+              'extract-screens',
+              'generate-theme',
+              'semantic-analysis'
+            ]
+          }
+        });
+      } catch (uiError) {
+        logger.warn(MODULE_NAME, 'initializePluginWithErrorHandling', 'Failed to send ready message to UI');
+      }
+    }, 100);
     
   } catch (error) {
     ErrorHandler.handle(error as Error, {
@@ -225,15 +277,19 @@ function initializePluginWithErrorHandling(): void {
     
     // Try to show a basic error message to the user
     try {
-      figma.ui.postMessage({
-        type: MESSAGE_TYPES.CRITICAL_ERROR,
-        error: {
-          message: 'Plugin failed to initialize',
-          timestamp: Date.now()
-        }
-      });
+      if (figma && figma.ui && figma.ui.postMessage) {
+        figma.ui.postMessage({
+          type: MESSAGE_TYPES.CRITICAL_ERROR,
+          error: {
+            message: 'Plugin failed to initialize',
+            timestamp: Date.now(),
+            details: (error as Error).message
+          }
+        });
+      }
     } catch (uiError) {
       console.error('Critical error: Failed to initialize plugin and cannot communicate with UI:', error);
+      console.error('UI communication error:', uiError);
     }
   }
 }

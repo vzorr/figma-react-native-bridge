@@ -1,5 +1,5 @@
 // src/handlers/extract-screens-handler.ts
-// Handler for comprehensive screens extraction - uses existing code.ts functionality
+// Handler for comprehensive screens extraction - Fixed TypeScript errors
 
 import { logger, LogFunction } from '@core/logger';
 import { ErrorHandler } from '@core/error-handler';
@@ -18,7 +18,7 @@ export default class ExtractScreensHandler {
       this.sendProgress(10);
       
       // Find all frames in ALL pages, not just current page
-      const allPages = figma.root.children.filter((node: any) => node.type === 'PAGE');
+      const allPages = this.getAllPages();
       let allFrames: any[] = [];
       
       allPages.forEach((page: any) => {
@@ -28,8 +28,8 @@ export default class ExtractScreensHandler {
       
       if (allFrames.length === 0) {
         figma.ui.postMessage({
-          type: MESSAGE_TYPES.EXTRACTION_ERROR,
-          error: 'No frames found across all pages. Please create some frames to extract as screens.'
+          type: 'error', // UI expects this format
+          message: 'No frames found across all pages. Please create some frames to extract as screens.'
         });
         return;
       }
@@ -80,7 +80,7 @@ export default class ExtractScreensHandler {
       logger.info(MODULE_NAME, FUNC_NAME, `Comprehensive extraction complete. Generated ${screens.length} screens with semantic analysis.`);
       
       figma.ui.postMessage({
-        type: MESSAGE_TYPES.SCREENS_EXTRACTED,
+        type: 'screens-extracted', // UI expects this format
         data: result
       });
       
@@ -94,9 +94,30 @@ export default class ExtractScreensHandler {
     }
   }
 
+  private getAllPages(): any[] {
+    try {
+      // Try to access figma.root first (newer API)
+      if (figma && 'root' in figma && figma.root && figma.root.children) {
+        return figma.root.children.filter((node: any) => node.type === 'PAGE');
+      }
+      
+      // Fallback to current page only if root is not available
+      if (figma && figma.currentPage) {
+        logger.warn(MODULE_NAME, 'getAllPages', 'figma.root not available, using current page only');
+        return [figma.currentPage];
+      }
+      
+      logger.error(MODULE_NAME, 'getAllPages', 'No Figma API access available');
+      return [];
+    } catch (error) {
+      logger.error(MODULE_NAME, 'getAllPages', 'Error accessing Figma pages:', error as Error);
+      return figma.currentPage ? [figma.currentPage] : [];
+    }
+  }
+
   private sendProgress(progress: number): void {
     figma.ui.postMessage({
-      type: MESSAGE_TYPES.PROGRESS_UPDATE,
+      type: 'progress', // UI expects this format
       progress: progress
     });
   }
@@ -121,7 +142,7 @@ export default class ExtractScreensHandler {
     };
 
     // Extract from all pages
-    const allPages = figma.root.children.filter((node: any) => node.type === 'PAGE');
+    const allPages = this.getAllPages();
     
     allPages.forEach((page: any) => {
       const allNodes = page.findAll();
@@ -236,25 +257,29 @@ export default class ExtractScreensHandler {
     
     const allNodes = frame.findAll();
     allNodes.forEach((node: any) => {
-      // Analyze color usage
-      const bgColor = this.getNodeBackgroundColor(node);
-      if (bgColor) analysis.colorUsage.add(bgColor);
-      
-      const textColor = this.getNodeTextColor(node);
-      if (textColor) analysis.colorUsage.add(textColor);
-      
-      // Analyze typography
-      if (node.type === 'TEXT' && typeof node.fontSize === 'number') {
-        analysis.fontSizeUsage.add(node.fontSize);
+      try {
+        // Analyze color usage
+        const bgColor = this.getNodeBackgroundColor(node);
+        if (bgColor) analysis.colorUsage.add(bgColor);
+        
+        const textColor = this.getNodeTextColor(node);
+        if (textColor) analysis.colorUsage.add(textColor);
+        
+        // Analyze typography
+        if (node.type === 'TEXT' && typeof node.fontSize === 'number') {
+          analysis.fontSizeUsage.add(node.fontSize);
+        }
+        
+        // Analyze spacing
+        if ('paddingLeft' in node && typeof node.paddingLeft === 'number') {
+          analysis.spacingUsage.add(node.paddingLeft);
+        }
+        
+        // Analyze component types
+        analysis.componentTypes.add(this.determineSemanticType(node));
+      } catch (nodeError) {
+        // Skip problematic nodes
       }
-      
-      // Analyze spacing
-      if ('paddingLeft' in node && typeof node.paddingLeft === 'number') {
-        analysis.spacingUsage.add(node.paddingLeft);
-      }
-      
-      // Analyze component types
-      analysis.componentTypes.add(this.determineSemanticType(node));
     });
     
     return {
@@ -407,13 +432,7 @@ export default class ExtractScreensHandler {
     
     // Generate imports based on components used
     const componentTypes = new Set<string>();
-    function collectComponentTypes(components: any[]) {
-      components.forEach(comp => {
-        componentTypes.add(comp.semanticType);
-        if (comp.children) collectComponentTypes(comp.children);
-      });
-    }
-    collectComponentTypes(screenStructure.components);
+    this.collectComponentTypes(screenStructure.components, componentTypes);
     
     const imports = ['View', 'Text', 'StyleSheet', 'ScrollView'];
     if (componentTypes.has('button')) imports.push('TouchableOpacity');
@@ -421,98 +440,81 @@ export default class ExtractScreensHandler {
     if (componentTypes.has('navigation')) imports.push('SafeAreaView');
     
     // Generate component JSX with semantic understanding
-    function generateSemanticJSX(components: any[], depth: number = 1): string {
-      const indent = '  '.repeat(depth);
-      
-      return components.map((component: any) => {
-        let jsx = '';
-        
-        switch (component.semanticType) {
-          case 'button':
-            jsx = `${indent}<TouchableOpacity style={[styles.button, styles.${component.name.toLowerCase().replace(/\s+/g, '')}]}>
-${indent}  <Text style={styles.buttonText}>{/* ${component.name} */}Button</Text>
-${indent}</TouchableOpacity>`;
-            break;
-            
-          case 'input':
-            jsx = `${indent}<TextInput
-${indent}  style={[styles.input, styles.${component.name.toLowerCase().replace(/\s+/g, '')}]}
-${indent}  placeholder="${component.text || 'Enter text...'}"
-${indent}  placeholderTextColor={theme.color('gray6')}
-${indent}/>`;
-            break;
-            
-          case 'heading':
-            jsx = `${indent}<Text style={[styles.heading, styles.h${this.getHeadingLevel({ name: component.name, fontSize: component.fontSize })}]}>
-${indent}  {/* ${component.text || 'Heading'} */}
-${indent}  ${component.text || 'Heading'}
-${indent}</Text>`;
-            break;
-            
-          case 'label':
-          case 'text':
-            jsx = `${indent}<Text style={[styles.text, styles.${component.semanticType}]}>
-${indent}  {/* ${component.text || 'Text content'} */}
-${indent}  ${component.text || 'Text content'}
-${indent}</Text>`;
-            break;
-            
-          case 'card':
-            jsx = `${indent}<View style={[styles.card, styles.${component.name.toLowerCase().replace(/\s+/g, '')}]}>`;
-            if (component.children && component.children.length > 0) {
-              jsx += '\n' + generateSemanticJSX(component.children, depth + 1);
-            }
-            jsx += `\n${indent}</View>`;
-            break;
-            
-          case 'navigation':
-            jsx = `${indent}<View style={[styles.navigation, styles.${component.name.toLowerCase().replace(/\s+/g, '')}]}>`;
-            if (component.children && component.children.length > 0) {
-              jsx += '\n' + generateSemanticJSX(component.children, depth + 1);
-            }
-            jsx += `\n${indent}</View>`;
-            break;
-            
-          case 'container':
-          default:
-            jsx = `${indent}<View style={[styles.container, styles.${component.name.toLowerCase().replace(/\s+/g, '')}]}>`;
-            if (component.children && component.children.length > 0) {
-              jsx += '\n' + generateSemanticJSX(component.children, depth + 1);
-            }
-            jsx += `\n${indent}</View>`;
-        }
-        
-        return jsx;
-      }).join('\n');
-    }
-    
     const componentsJSX = screenStructure.components.length > 0 
-      ? generateSemanticJSX(screenStructure.components)
+      ? this.generateSemanticJSX(screenStructure.components, theme)
       : '      <Text style={styles.placeholder}>No components found in this frame</Text>';
     
     // Generate styles based on actual components
-    function generateComponentStyles(components: any[]): string {
-      const styles: string[] = [];
-      
-      function processComponents(comps: any[]) {
-        comps.forEach(comp => {
-          const styleName = comp.name.toLowerCase().replace(/\s+/g, '');
-          
-          switch (comp.semanticType) {
-            case 'button':
-              styles.push(`  ${styleName}: {
-    backgroundColor: '${comp.backgroundColor || theme.colors?.primary || '#007AFF'}',
-    paddingVertical: ${Math.max(comp.height / 4, 8)},
-    paddingHorizontal: ${Math.max(comp.width / 8, 16)},
-    borderRadius: ${comp.borderRadius || 8},
+    const componentStyles = this.generateComponentStyles(screenStructure.components, theme);
+    
+    return `// ${componentName}.tsx - Generated from Figma
+// Screen: ${screenStructure.name}${screenStructure.page ? ` (${screenStructure.page})` : ''}
+// Device: ${screenStructure.deviceType} • Layout: ${screenStructure.layoutType}
+// Dimensions: ${screenStructure.width} × ${screenStructure.height}px
+${screenStructure.designSystem ? `// Component Types: ${screenStructure.designSystem.componentTypes?.join(', ') || 'None'}` : ''}
+
+import React from 'react';
+import {
+  ${imports.join(',\n  ')},
+  Dimensions,
+} from 'react-native';
+import theme from '../theme';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+
+interface ${componentName}Props {
+  navigation?: any;
+}
+
+const ${componentName}: React.FC<${componentName}Props> = ({ navigation }) => {
+  return (
+    ${screenStructure.deviceType === 'mobile' ? '<SafeAreaView style={styles.safeArea}>' : '<View style={styles.container}>'}
+      <ScrollView 
+        style={styles.screen} 
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+${componentsJSX}
+      </ScrollView>
+    ${screenStructure.deviceType === 'mobile' ? '</SafeAreaView>' : '</View>'}
+  );
+};
+
+const styles = StyleSheet.create({
+  ${screenStructure.deviceType === 'mobile' ? `safeArea: {
+    flex: 1,
+    backgroundColor: '${screenStructure.backgroundColor || theme.colors?.white || '#FFFFFF'}',
+  },` : ''}
+  screen: {
+    flex: 1,
+    backgroundColor: '${screenStructure.backgroundColor || theme.colors?.white || '#FFFFFF'}',
+  },
+  content: {
+    width: ${screenStructure.width},
+    minHeight: ${screenStructure.height},
+    alignSelf: 'center',
+    paddingVertical: 16,
+  },
+  container: {
+    backgroundColor: 'transparent',
+    marginVertical: 8,
+  },
+  button: {
+    backgroundColor: '${theme.colors?.primary || '#007AFF'}',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-  },`);
-              break;
-              
-            case 'input':
-              styles.push(`  ${styleName}: {
-    backgroundColor: '${comp.backgroundColor || '#FFFFFF'}',
+    marginVertical: 4,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  input: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '${theme.colors?.gray3 || '#E1E5E9'}',
     borderRadius: 8,
@@ -586,6 +588,199 @@ Design System Analysis:
 - Device Type: ${screenStructure.deviceType}
 - Layout: ${screenStructure.layoutType}
 */`;
+  }
+
+  private collectComponentTypes(components: any[], componentTypes: Set<string>): void {
+    components.forEach(comp => {
+      if (comp.semanticType) {
+        componentTypes.add(comp.semanticType);
+      }
+      if (comp.children) {
+        this.collectComponentTypes(comp.children, componentTypes);
+      }
+    });
+  }
+
+  private generateSemanticJSX(components: any[], theme: any, depth: number = 1): string {
+    const indent = '  '.repeat(depth);
+    
+    return components.map((component: any) => {
+      let jsx = '';
+      
+      try {
+        switch (component.semanticType) {
+          case 'button':
+            jsx = `${indent}<TouchableOpacity style={[styles.button, styles.${this.sanitizeStyleName(component.name)}]}>
+${indent}  <Text style={styles.buttonText}>{/* ${component.name} */}Button</Text>
+${indent}</TouchableOpacity>`;
+            break;
+            
+          case 'input':
+            jsx = `${indent}<TextInput
+${indent}  style={[styles.input, styles.${this.sanitizeStyleName(component.name)}]}
+${indent}  placeholder="${component.text || 'Enter text...'}"
+${indent}  placeholderTextColor={theme.colors?.gray6 || '#999999'}
+${indent}/>`;
+            break;
+            
+          case 'heading':
+            jsx = `${indent}<Text style={[styles.heading, styles.h${this.getComponentHeadingLevel(component)}]}>
+${indent}  {/* ${component.text || 'Heading'} */}
+${indent}  ${component.text || 'Heading'}
+${indent}</Text>`;
+            break;
+            
+          case 'label':
+          case 'text':
+            jsx = `${indent}<Text style={[styles.text, styles.${component.semanticType}]}>
+${indent}  {/* ${component.text || 'Text content'} */}
+${indent}  ${component.text || 'Text content'}
+${indent}</Text>`;
+            break;
+            
+          case 'card':
+            jsx = `${indent}<View style={[styles.card, styles.${this.sanitizeStyleName(component.name)}]}>`;
+            if (component.children && component.children.length > 0) {
+              jsx += '\n' + this.generateSemanticJSX(component.children, theme, depth + 1);
+            }
+            jsx += `\n${indent}</View>`;
+            break;
+            
+          case 'navigation':
+            jsx = `${indent}<View style={[styles.navigation, styles.${this.sanitizeStyleName(component.name)}]}>`;
+            if (component.children && component.children.length > 0) {
+              jsx += '\n' + this.generateSemanticJSX(component.children, theme, depth + 1);
+            }
+            jsx += `\n${indent}</View>`;
+            break;
+            
+          case 'container':
+          default:
+            jsx = `${indent}<View style={[styles.container, styles.${this.sanitizeStyleName(component.name)}]}>`;
+            if (component.children && component.children.length > 0) {
+              jsx += '\n' + this.generateSemanticJSX(component.children, theme, depth + 1);
+            }
+            jsx += `\n${indent}</View>`;
+        }
+        
+        return jsx;
+      } catch (componentError) {
+        logger.warn(MODULE_NAME, 'generateSemanticJSX', 'Error generating JSX for component:', {
+          component: component.name,
+          error: componentError
+        });
+        
+        // Fallback to simple view
+        return `${indent}<View style={styles.container}>
+${indent}  {/* Error rendering ${component.name} */}
+${indent}</View>`;
+      }
+    }).join('\n');
+  }
+
+  private generateComponentStyles(components: any[], theme: any): string {
+    const styles: string[] = [];
+    
+    try {
+      this.processComponentsForStyles(components, styles, theme);
+      return styles.join('\n');
+    } catch (error) {
+      logger.error(MODULE_NAME, 'generateComponentStyles', 'Error generating component styles:', error as Error);
+      return '  // Error generating component styles';
+    }
+  }
+
+  private processComponentsForStyles(components: any[], styles: string[], theme: any): void {
+    components.forEach(comp => {
+      try {
+        const styleName = this.sanitizeStyleName(comp.name);
+        
+        switch (comp.semanticType) {
+          case 'button':
+            styles.push(`  ${styleName}: {
+    backgroundColor: '${comp.backgroundColor || theme.colors?.primary || '#007AFF'}',
+    paddingVertical: ${Math.max(comp.height / 4, 8)},
+    paddingHorizontal: ${Math.max(comp.width / 8, 16)},
+    borderRadius: ${comp.borderRadius || 8},
+    alignItems: 'center',
+    justifyContent: 'center',
+  },`);
+            break;
+            
+          case 'input':
+            styles.push(`  ${styleName}: {
+    backgroundColor: '${comp.backgroundColor || '#FFFFFF'}',
+    borderWidth: 1,
+    borderColor: '${theme.colors?.gray3 || '#E1E5E9'}',
+    borderRadius: ${comp.borderRadius || 8},
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: ${comp.fontSize || 16},
+    height: ${comp.height || 44},
+  },`);
+            break;
+            
+          case 'card':
+            styles.push(`  ${styleName}: {
+    backgroundColor: '${comp.backgroundColor || '#FFFFFF'}',
+    borderRadius: ${comp.borderRadius || 12},
+    padding: 16,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },`);
+            break;
+            
+          case 'navigation':
+            styles.push(`  ${styleName}: {
+    backgroundColor: '${comp.backgroundColor || '#FFFFFF'}',
+    height: ${comp.height || 60},
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },`);
+            break;
+        }
+        
+        if (comp.children) {
+          this.processComponentsForStyles(comp.children, styles, theme);
+        }
+      } catch (compError) {
+        logger.warn(MODULE_NAME, 'processComponentsForStyles', 'Error processing component style:', {
+          component: comp.name,
+          error: compError
+        });
+      }
+    });
+  }
+
+  private sanitizeStyleName(name: string): string {
+    try {
+      return name.toLowerCase().replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '') || 'component';
+    } catch (error) {
+      return 'component';
+    }
+  }
+
+  private getComponentHeadingLevel(component: any): number {
+    try {
+      const name = component.name.toLowerCase();
+      if (name.includes('h1') || name.includes('title')) return 1;
+      if (name.includes('h2') || name.includes('subtitle')) return 2;
+      if (name.includes('h3') || name.includes('heading')) return 3;
+      
+      const fontSize = component.fontSize || 16;
+      if (fontSize >= 32) return 1;
+      if (fontSize >= 24) return 2;
+      if (fontSize >= 20) return 3;
+      return 2;
+    } catch (error) {
+      return 2;
+    }
   }
 
   // Helper methods copied from existing code.ts
@@ -750,33 +945,6 @@ Design System Analysis:
         values.navigationItems.push(navData);
       }
     }
-  }
-
-  // All helper methods from existing code.ts
-  private rgbToHex(r: number, g: number, b: number): string {
-    const toHex = (c: number): string => {
-      const hex = Math.round(c * 255).toString(16);
-      return hex.length === 1 ? '0' + hex : hex;
-    };
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
-  }
-
-  private isValidNumber(value: any): boolean {
-    return typeof value === 'number' && !isNaN(value) && isFinite(value);
-  }
-
-  private safeGetNumber(value: any, defaultValue: number = 0): number {
-    if (typeof value === 'number' && !isNaN(value)) {
-      return value;
-    }
-    return defaultValue;
-  }
-
-  private sanitizeName(name: string): string {
-    return name
-      .replace(/[^a-zA-Z0-9]/g, '')
-      .replace(/^[0-9]/, '_')
-      .toLowerCase();
   }
 
   // Component detection methods
@@ -1317,119 +1485,30 @@ Design System Analysis:
     
     return colorMappings[hex.toUpperCase()] || null;
   }
-}5E9'}',
-    borderRadius: ${comp.borderRadius || 8},
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    fontSize: ${comp.fontSize || 16},
-    height: ${comp.height || 44},
-  },`);
-              break;
-              
-            case 'card':
-              styles.push(`  ${styleName}: {
-    backgroundColor: '${comp.backgroundColor || '#FFFFFF'}',
-    borderRadius: ${comp.borderRadius || 12},
-    padding: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },`);
-              break;
-              
-            case 'navigation':
-              styles.push(`  ${styleName}: {
-    backgroundColor: '${comp.backgroundColor || '#FFFFFF'}',
-    height: ${comp.height || 60},
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },`);
-              break;
-          }
-          
-          if (comp.children) processComponents(comp.children);
-        });
-      }
-      
-      processComponents(components);
-      return styles.join('\n');
+
+  private rgbToHex(r: number, g: number, b: number): string {
+    const toHex = (c: number): string => {
+      const hex = Math.round(c * 255).toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    };
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+  }
+
+  private isValidNumber(value: any): boolean {
+    return typeof value === 'number' && !isNaN(value) && isFinite(value);
+  }
+
+  private safeGetNumber(value: any, defaultValue: number = 0): number {
+    if (typeof value === 'number' && !isNaN(value)) {
+      return value;
     }
-    
-    const componentStyles = generateComponentStyles(screenStructure.components);
-    
-    return `// ${componentName}.tsx - Generated from Figma
-// Screen: ${screenStructure.name} (${screenStructure.page})
-// Device: ${screenStructure.deviceType} • Layout: ${screenStructure.layoutType}
-// Dimensions: ${screenStructure.width} × ${screenStructure.height}px
-// Components: ${Object.keys(screenStructure.designSystem?.componentTypes || {}).join(', ')}
+    return defaultValue;
+  }
 
-import React from 'react';
-import {
-  ${imports.join(',\n  ')},
-  Dimensions,
-} from 'react-native';
-import theme from '../theme';
-
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-
-interface ${componentName}Props {
-  // Add your props here
-  navigation?: any;
+  private sanitizeName(name: string): string {
+    return name
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .replace(/^[0-9]/, '_')
+      .toLowerCase();
+  }
 }
-
-const ${componentName}: React.FC<${componentName}Props> = ({ navigation }) => {
-  return (
-    ${screenStructure.deviceType === 'mobile' ? '<SafeAreaView style={styles.safeArea}>' : '<View style={styles.container}>'}
-      <ScrollView 
-        style={styles.screen} 
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-${componentsJSX}
-      </ScrollView>
-    ${screenStructure.deviceType === 'mobile' ? '</SafeAreaView>' : '</View>'}
-  );
-};
-
-const styles = StyleSheet.create({
-  ${screenStructure.deviceType === 'mobile' ? `safeArea: {
-    flex: 1,
-    backgroundColor: '${screenStructure.backgroundColor || theme.colors?.white || '#FFFFFF'}',
-  },` : ''}
-  screen: {
-    flex: 1,
-    backgroundColor: '${screenStructure.backgroundColor || theme.colors?.white || '#FFFFFF'}',
-  },
-  content: {
-    width: ${screenStructure.width},
-    minHeight: ${screenStructure.height},
-    alignSelf: 'center',
-    paddingVertical: 16,
-  },
-  container: {
-    backgroundColor: 'transparent',
-    marginVertical: 8,
-  },
-  button: {
-    backgroundColor: '${theme.colors?.primary || '#007AFF'}',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 4,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '${theme.colors?.gray3 || '#E1E
