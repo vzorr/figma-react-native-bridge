@@ -1,4 +1,4 @@
-// src/main.ts - Enhanced with Flow Handling
+// src/main.ts - Enhanced with Flow Handling - FIXED VERSION
 // Main entry point for Figma React Native Bridge Plugin
 
 import { logger, LogLevel } from './core/logger';
@@ -6,9 +6,9 @@ import { ErrorHandler } from './core/error-handler';
 import { MESSAGE_TYPES, FLOW_MESSAGE_TYPES } from './core/constants';
 import { ExtractValuesHandler } from './handlers/extract-values-handler';
 import ExtractScreensHandler from './handlers/extract-screens-handler';
-import { ExtractFlowsHandler } from './handlers/extract-flows-handler'; // NEW
-import { ScreenGenerator } from './generators/screen-generator'; // NEW
-import { ThemeGenerator } from './generators/theme-generator'; // NEW
+import { ExtractFlowsHandler } from './handlers/extract-flows-handler';
+import { ScreenGenerator } from './generators/screen-generator';
+import { ThemeGenerator } from './generators/theme-generator';
 
 declare const figma: any;
 declare const __html__: string;
@@ -18,18 +18,18 @@ const MODULE_NAME = 'Main';
 class FigmaReactNativeBridge {
   private extractValuesHandler: ExtractValuesHandler;
   private extractScreensHandler: ExtractScreensHandler;
-  private extractFlowsHandler: ExtractFlowsHandler; // NEW
-  private screenGenerator: ScreenGenerator; // NEW
-  private themeGenerator: ThemeGenerator; // NEW
+  private extractFlowsHandler: ExtractFlowsHandler;
+  private screenGenerator: ScreenGenerator;
+  private themeGenerator: ThemeGenerator;
 
   constructor() {
     try {
       // Initialize handlers
       this.extractValuesHandler = new ExtractValuesHandler();
       this.extractScreensHandler = new ExtractScreensHandler();
-      this.extractFlowsHandler = new ExtractFlowsHandler(); // NEW
-      this.screenGenerator = new ScreenGenerator(); // NEW
-      this.themeGenerator = new ThemeGenerator(); // NEW
+      this.extractFlowsHandler = new ExtractFlowsHandler();
+      this.screenGenerator = new ScreenGenerator();
+      this.themeGenerator = new ThemeGenerator();
       
       logger.info(MODULE_NAME, 'constructor', 'Figma React Native Bridge Plugin initialized with flow support');
     } catch (error) {
@@ -79,12 +79,12 @@ class FigmaReactNativeBridge {
               capabilities: [
                 'extract-tokens',
                 'extract-screens', 
-                'detect-flows', // NEW
-                'generate-flow-code', // NEW
-                'generate-screen-code', // NEW
-                'export-flow-theme', // NEW
+                'detect-flows',
+                'generate-flow-code',
+                'generate-screen-code',
+                'export-flow-theme',
                 'semantic-analysis',
-                'user-role-detection' // NEW
+                'user-role-detection'
               ]
             }
           });
@@ -137,7 +137,7 @@ class FigmaReactNativeBridge {
           await this.extractScreensHandler.handle(messageData.options);
           break;
           
-        // NEW: Flow-specific handlers
+        // Flow-specific handlers
         case MESSAGE_TYPES.DETECT_FLOWS:
         case 'detect-flows':
           await this.extractFlowsHandler.handleFlowDetection(messageData.options);
@@ -217,15 +217,15 @@ class FigmaReactNativeBridge {
     }
   }
 
-  // NEW: Generate complete flow code
+  // Generate complete flow code
   private async handleGenerateFlowCode(flowId: string): Promise<void> {
     const FUNC_NAME = 'handleGenerateFlowCode';
     
     try {
       logger.info(MODULE_NAME, FUNC_NAME, `Generating code for flow: ${flowId}`);
       
-      // Get the specific flow
-      const flow = this.extractFlowsHandler.getFlowById?.(flowId);
+      // Get the specific flow from the flow extractor
+      const flow = this.extractFlowsHandler.getFlowById(flowId);
       if (!flow) {
         throw new Error(`Flow ${flowId} not found`);
       }
@@ -256,7 +256,7 @@ class FigmaReactNativeBridge {
     }
   }
 
-  // NEW: Generate specific screen code
+  // Generate specific screen code
   private async handleGenerateScreenCode(flowId: string, screenName: string): Promise<void> {
     const FUNC_NAME = 'handleGenerateScreenCode';
     
@@ -264,7 +264,7 @@ class FigmaReactNativeBridge {
       logger.info(MODULE_NAME, FUNC_NAME, `Generating code for screen: ${screenName} in flow: ${flowId}`);
       
       // Get the specific screen from the flow
-      const flow = this.extractFlowsHandler.getFlowById?.(flowId);
+      const flow = this.extractFlowsHandler.getFlowById(flowId);
       if (!flow) {
         throw new Error(`Flow ${flowId} not found`);
       }
@@ -304,14 +304,14 @@ class FigmaReactNativeBridge {
     }
   }
 
-  // NEW: Export flow-specific theme
+  // Export flow-specific theme
   private async handleExportFlowTheme(flowId: string): Promise<void> {
     const FUNC_NAME = 'handleExportFlowTheme';
     
     try {
       logger.info(MODULE_NAME, FUNC_NAME, `Exporting theme for flow: ${flowId}`);
       
-      const flow = this.extractFlowsHandler.getFlowById?.(flowId);
+      const flow = this.extractFlowsHandler.getFlowById(flowId);
       if (!flow) {
         throw new Error(`Flow ${flowId} not found`);
       }
@@ -429,8 +429,197 @@ ${screenComponents.join('\n\n')}`;
   }
 
   private generateFlowNavigator(flow: any, theme: any): string {
-    // Generate navigation logic specific to flow type
-    return `// Flow Navigator for ${flow.name}`;
+    const componentName = this.sanitizeComponentName(flow.name);
+    const screens = flow.screens || [];
+    
+    return `// ${componentName}Navigator.tsx - Generated Flow Navigator
+// Flow: ${flow.name}
+// Navigation Pattern: ${flow.navigationPattern}
+
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createDrawerNavigator } from '@react-navigation/drawer';
+
+// Screen imports
+${screens.map((screen: any) => 
+  `import ${this.sanitizeComponentName(screen.name)} from '../screens/${this.sanitizeComponentName(screen.name)}';`
+).join('\n')}
+
+// Theme import
+import theme from '../theme';
+
+const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
+const Drawer = createDrawerNavigator();
+
+interface ${componentName}NavigatorProps {
+  initialRoute?: string;
+  onNavigationStateChange?: (state: any) => void;
+}
+
+${this.generateNavigatorComponent(flow, screens, componentName)}
+
+export default ${componentName}Navigator;
+
+// Navigation utilities
+export const navigate${componentName} = {
+${screens.map((screen: any, index: number) => `  to${this.sanitizeComponentName(screen.name)}: () => navigate('${screen.name}'),`).join('\n')}
+};
+
+// Type exports for navigation
+export type ${componentName}StackParamList = {
+${screens.map((screen: any) => `  ${screen.name}: undefined;`).join('\n')}
+};
+
+/*
+Flow Information:
+- User Role: ${flow.userRole?.name || 'Unknown'}
+- Flow Type: ${flow.flowType}
+- Device Targets: ${flow.deviceTargets?.join(', ') || 'Unknown'}
+- Estimated Duration: ${flow.estimatedDuration || 'Unknown'} seconds
+- Screen Count: ${screens.length}
+*/`;
+  }
+
+  private generateNavigatorComponent(flow: any, screens: any[], componentName: string): string {
+    const pattern = flow.navigationPattern || 'stack';
+    
+    switch (pattern) {
+      case 'tab':
+        return this.generateTabNavigator(screens, componentName);
+      case 'drawer':
+        return this.generateDrawerNavigator(screens, componentName);
+      case 'modal':
+        return this.generateModalNavigator(screens, componentName);
+      default:
+        return this.generateStackNavigator(screens, componentName);
+    }
+  }
+
+  private generateStackNavigator(screens: any[], componentName: string): string {
+    return `const ${componentName}Navigator: React.FC<${componentName}NavigatorProps> = ({ 
+  initialRoute = '${screens[0]?.name || 'Home'}',
+  onNavigationStateChange 
+}) => {
+  return (
+    <NavigationContainer onStateChange={onNavigationStateChange}>
+      <Stack.Navigator 
+        initialRouteName={initialRoute}
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: theme.colors?.primary || '#007AFF',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      >
+${screens.map((screen: any) => `        <Stack.Screen 
+          name="${screen.name}" 
+          component={${this.sanitizeComponentName(screen.name)}} 
+          options={{ 
+            title: '${screen.name}',
+            headerShown: true
+          }}
+        />`).join('\n')}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};`;
+  }
+
+  private generateTabNavigator(screens: any[], componentName: string): string {
+    return `const ${componentName}Navigator: React.FC<${componentName}NavigatorProps> = ({ 
+  initialRoute = '${screens[0]?.name || 'Home'}',
+  onNavigationStateChange 
+}) => {
+  return (
+    <NavigationContainer onStateChange={onNavigationStateChange}>
+      <Tab.Navigator 
+        initialRouteName={initialRoute}
+        screenOptions={{
+          tabBarStyle: {
+            backgroundColor: theme.colors?.white || '#FFFFFF',
+          },
+          tabBarActiveTintColor: theme.colors?.primary || '#007AFF',
+          tabBarInactiveTintColor: theme.colors?.gray || '#999999',
+        }}
+      >
+${screens.slice(0, 5).map((screen: any) => `        <Tab.Screen 
+          name="${screen.name}" 
+          component={${this.sanitizeComponentName(screen.name)}} 
+          options={{ 
+            title: '${screen.name}',
+            tabBarIcon: ({ color, size }) => (
+              <Text style={{ color, fontSize: size }}>📱</Text>
+            )
+          }}
+        />`).join('\n')}
+      </Tab.Navigator>
+    </NavigationContainer>
+  );
+};`;
+  }
+
+  private generateDrawerNavigator(screens: any[], componentName: string): string {
+    return `const ${componentName}Navigator: React.FC<${componentName}NavigatorProps> = ({ 
+  initialRoute = '${screens[0]?.name || 'Home'}',
+  onNavigationStateChange 
+}) => {
+  return (
+    <NavigationContainer onStateChange={onNavigationStateChange}>
+      <Drawer.Navigator 
+        initialRouteName={initialRoute}
+        screenOptions={{
+          drawerStyle: {
+            backgroundColor: theme.colors?.white || '#FFFFFF',
+          },
+          drawerActiveTintColor: theme.colors?.primary || '#007AFF',
+        }}
+      >
+${screens.map((screen: any) => `        <Drawer.Screen 
+          name="${screen.name}" 
+          component={${this.sanitizeComponentName(screen.name)}} 
+          options={{ title: '${screen.name}' }}
+        />`).join('\n')}
+      </Drawer.Navigator>
+    </NavigationContainer>
+  );
+};`;
+  }
+
+  private generateModalNavigator(screens: any[], componentName: string): string {
+    return `const ${componentName}Navigator: React.FC<${componentName}NavigatorProps> = ({ 
+  initialRoute = '${screens[0]?.name || 'Home'}',
+  onNavigationStateChange 
+}) => {
+  return (
+    <NavigationContainer onStateChange={onNavigationStateChange}>
+      <Stack.Navigator 
+        initialRouteName={initialRoute}
+        screenOptions={{
+          presentation: 'modal',
+          headerStyle: {
+            backgroundColor: theme.colors?.primary || '#007AFF',
+          },
+          headerTintColor: '#fff',
+        }}
+      >
+${screens.map((screen: any) => `        <Stack.Screen 
+          name="${screen.name}" 
+          component={${this.sanitizeComponentName(screen.name)}} 
+          options={{ 
+            title: '${screen.name}',
+            presentation: 'modal'
+          }}
+        />`).join('\n')}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};`;
   }
 
   private extractDesignValuesFromFlow(flow: any): any {
@@ -556,7 +745,7 @@ ${screenComponents.join('\n\n')}`;
 // Global instance for cleanup
 let bridgeInstance: FigmaReactNativeBridge | null = null;
 
-// Error boundary and initialization (same as before)
+// Error boundary and initialization
 function initializePluginWithErrorHandling(): void {
   try {
     // Set up global error handling

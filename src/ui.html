@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Figma React Native Bridge - Flow Navigator</title>
+  <title>Figma React Native Bridge - Advanced Flow Navigator</title>
   <style>
     * { box-sizing: border-box; }
     
@@ -58,6 +58,33 @@
     
     .breadcrumb-separator {
       opacity: 0.6;
+    }
+    
+    /* View toggle buttons */
+    .view-toggle {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
+    
+    .toggle-btn {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .toggle-btn:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    
+    .toggle-btn.active {
+      background: rgba(255,255,255,0.3);
+      border-color: rgba(255,255,255,0.4);
     }
     
     /* Main content area */
@@ -274,6 +301,67 @@
       margin: 12px 0;
     }
     
+    /* Flow Diagram View */
+    .flow-diagram-container {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e1e8ed;
+      padding: 20px;
+      margin-bottom: 20px;
+      min-height: 300px;
+    }
+    
+    .flow-diagram {
+      width: 100%;
+      height: 280px;
+      border-radius: 8px;
+      background: linear-gradient(45deg, #f8f9fa 0%, #e9ecef 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .flow-node {
+      position: absolute;
+      background: white;
+      border: 2px solid #667eea;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 11px;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      cursor: pointer;
+      transition: all 0.2s;
+      min-width: 80px;
+      text-align: center;
+    }
+    
+    .flow-node:hover {
+      transform: scale(1.05);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .flow-node.selected {
+      background: #667eea;
+      color: white;
+    }
+    
+    .flow-connection {
+      position: absolute;
+      height: 2px;
+      background: #667eea;
+      opacity: 0.6;
+    }
+    
+    .flow-arrow {
+      position: absolute;
+      width: 0;
+      height: 0;
+      border-left: 6px solid #667eea;
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+    }
+    
+    /* Enhanced Screens Section */
     .screens-section {
       background: white;
       border-radius: 12px;
@@ -322,15 +410,85 @@
       box-shadow: 0 0 0 1px #667eea;
     }
     
+    /* Enhanced Screen Preview */
     .screen-preview {
-      height: 120px;
+      height: 140px;
       background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 11px;
-      color: #666;
       position: relative;
+      overflow: hidden;
+    }
+    
+    .screen-mockup {
+      width: 90%;
+      height: 90%;
+      background: white;
+      border-radius: 6px;
+      border: 1px solid #dee2e6;
+      position: relative;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    
+    .screen-mockup.mobile {
+      border-radius: 12px;
+      border-width: 2px;
+    }
+    
+    .screen-mockup.tablet {
+      border-radius: 8px;
+    }
+    
+    .screen-mockup.desktop {
+      border-radius: 4px;
+    }
+    
+    .screen-content {
+      padding: 8px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .component-preview {
+      height: 12px;
+      border-radius: 2px;
+      opacity: 0.7;
+    }
+    
+    .component-preview.header {
+      background: linear-gradient(90deg, #667eea, #764ba2);
+      height: 16px;
+    }
+    
+    .component-preview.button {
+      background: #667eea;
+      height: 10px;
+      width: 60%;
+      align-self: center;
+      border-radius: 4px;
+    }
+    
+    .component-preview.input {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      height: 8px;
+    }
+    
+    .component-preview.text {
+      background: #e9ecef;
+      height: 6px;
+      width: 80%;
+    }
+    
+    .component-preview.card {
+      background: white;
+      border: 1px solid #e9ecef;
+      height: 20px;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     
     .screen-device-indicator {
@@ -338,9 +496,10 @@
       top: 8px;
       right: 8px;
       font-size: 10px;
-      background: rgba(255,255,255,0.8);
+      background: rgba(255,255,255,0.9);
       padding: 2px 6px;
       border-radius: 4px;
+      border: 1px solid #dee2e6;
     }
     
     .screen-info {
@@ -360,6 +519,33 @@
       display: flex;
       justify-content: space-between;
     }
+    
+    /* Enhanced Component Analysis */
+    .component-analysis {
+      margin-top: 8px;
+      font-size: 10px;
+      color: #666;
+    }
+    
+    .component-tags {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      margin-top: 4px;
+    }
+    
+    .component-tag {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      padding: 2px 6px;
+      border-radius: 8px;
+      font-size: 9px;
+    }
+    
+    .component-tag.button { background: #e3f2fd; border-color: #bbdefb; }
+    .component-tag.input { background: #fff3e0; border-color: #ffcc02; }
+    .component-tag.heading { background: #e8f5e8; border-color: #c8e6c9; }
+    .component-tag.card { background: #f3e5f5; border-color: #e1bee7; }
     
     /* Action Buttons */
     .action-bar {
@@ -419,6 +605,59 @@
     .button.outline:hover {
       background: #667eea;
       color: white;
+    }
+    
+    /* Enhanced Multi-file Generation */
+    .generation-options {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 16px;
+      margin: 16px 0;
+    }
+    
+    .generation-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #333;
+    }
+    
+    .option-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    
+    .option-card {
+      background: white;
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      padding: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .option-card:hover {
+      border-color: #667eea;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+    }
+    
+    .option-card.selected {
+      border-color: #667eea;
+      background: #f8f9ff;
+    }
+    
+    .option-title {
+      font-size: 12px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    
+    .option-description {
+      font-size: 10px;
+      color: #666;
+      line-height: 1.3;
     }
     
     /* Back button */
@@ -487,7 +726,7 @@
       }
     }
     
-    /* Code preview modal */
+    /* Enhanced Code preview modal */
     .modal-overlay {
       position: fixed;
       top: 0;
@@ -504,9 +743,9 @@
     .modal {
       background: white;
       border-radius: 12px;
-      width: 90%;
-      max-width: 600px;
-      max-height: 80%;
+      width: 95%;
+      max-width: 900px;
+      max-height: 90%;
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -534,6 +773,33 @@
       color: #666;
     }
     
+    /* File tabs */
+    .file-tabs {
+      display: flex;
+      border-bottom: 1px solid #e1e8ed;
+      background: #f8f9fa;
+    }
+    
+    .file-tab {
+      padding: 12px 20px;
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    
+    .file-tab:hover {
+      background: #e9ecef;
+    }
+    
+    .file-tab.active {
+      background: white;
+      border-bottom-color: #667eea;
+      color: #667eea;
+    }
+    
     .modal-body {
       flex: 1;
       overflow-y: auto;
@@ -545,21 +811,78 @@
       border: 1px solid #e9ecef;
       border-radius: 6px;
       padding: 16px;
-      font-family: 'SF Mono', Monaco, monospace;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
       font-size: 11px;
       line-height: 1.5;
       white-space: pre-wrap;
       overflow-x: auto;
+      max-height: 400px;
+    }
+    
+    /* Syntax highlighting */
+    .code-keyword { color: #d73a49; font-weight: 500; }
+    .code-string { color: #032f62; }
+    .code-comment { color: #6a737d; font-style: italic; }
+    .code-function { color: #6f42c1; }
+    .code-variable { color: #e36209; }
+    .code-operator { color: #d73a49; }
+    
+    /* Export options */
+    .export-options {
+      margin-top: 16px;
+      padding: 16px;
+      background: #f8f9fa;
+      border-radius: 6px;
+    }
+    
+    .export-title {
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    
+    .export-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 8px;
+    }
+    
+    .export-option {
+      padding: 8px 12px;
+      border: 1px solid #dee2e6;
+      border-radius: 4px;
+      background: white;
+      cursor: pointer;
+      text-align: center;
+      font-size: 11px;
+      transition: all 0.2s;
+    }
+    
+    .export-option:hover {
+      border-color: #667eea;
+      background: #f8f9ff;
     }
   </style>
 </head>
 <body>
   <div class="app-container">
-    <!-- Header with breadcrumbs -->
+    <!-- Header with breadcrumbs and view toggle -->
     <div class="header">
-      <h1 id="headerTitle">🌉 Figma → React Native Flow Bridge</h1>
-      <div class="breadcrumb" id="breadcrumb">
-        <span class="breadcrumb-item" onclick="showDashboard()">Flows</span>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+          <h1 id="headerTitle">🌉 Figma → React Native Flow Bridge</h1>
+          <div class="breadcrumb" id="breadcrumb">
+            <span class="breadcrumb-item" onclick="showDashboard()">Flows</span>
+          </div>
+        </div>
+        <div class="view-toggle" id="viewToggle" style="display: none;">
+          <button class="toggle-btn active" onclick="setViewMode('grid')" id="gridViewBtn">
+            📊 Grid View
+          </button>
+          <button class="toggle-btn" onclick="setViewMode('diagram')" id="diagramViewBtn">
+            🗺️ Flow Diagram
+          </button>
+        </div>
       </div>
       <div class="progress-bar" id="globalProgress" style="display: none;">
         <div class="progress-fill" id="globalProgressFill"></div>
@@ -572,11 +895,11 @@
       <!-- Initial Dashboard View -->
       <div id="dashboardView" class="dashboard">
         <div class="dashboard-header">
-          <h2 class="dashboard-title">Detect User Flows</h2>
+          <h2 class="dashboard-title">Advanced Flow Detection</h2>
           <div class="dashboard-stats" id="dashboardStats">
             <div class="stat-item">
               <span>🎯</span>
-              <span>Advanced Flow Detection</span>
+              <span>Multi-Strategy Detection</span>
             </div>
           </div>
         </div>
@@ -600,7 +923,7 @@
           <div class="empty-state-icon">🎯</div>
           <div class="empty-state-title">Ready to Detect Flows</div>
           <div class="empty-state-description">
-            Analyze your Figma design to automatically detect user flows, roles, and generate production-ready React Native code with intelligent design systems.
+            Analyze your Figma design to automatically detect user flows, roles, and generate production-ready React Native code with advanced design systems.
           </div>
         </div>
       </div>
@@ -615,6 +938,15 @@
           <!-- Flow details will be populated here -->
         </div>
         
+        <!-- Flow Diagram View -->
+        <div id="flowDiagramSection" class="flow-diagram-container" style="display: none;">
+          <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600;">Flow Diagram</h3>
+          <div class="flow-diagram" id="flowDiagram">
+            <!-- Flow diagram will be generated here -->
+          </div>
+        </div>
+        
+        <!-- Screens Section -->
         <div class="screens-section">
           <div class="screens-header">
             <h3 class="screens-title">Screens in Flow</h3>
@@ -625,16 +957,39 @@
           </div>
         </div>
         
+        <!-- Enhanced Generation Options -->
+        <div class="generation-options">
+          <div class="generation-title">🚀 Code Generation Options</div>
+          <div class="option-grid" id="generationOptions">
+            <div class="option-card selected" data-option="complete-flow">
+              <div class="option-title">📱 Complete Flow Package</div>
+              <div class="option-description">Navigation + Screens + Theme + Types</div>
+            </div>
+            <div class="option-card" data-option="individual-screen">
+              <div class="option-title">🎨 Individual Screen</div>
+              <div class="option-description">Single screen component with styling</div>
+            </div>
+            <div class="option-card" data-option="theme-only">
+              <div class="option-title">🎨 Flow Theme</div>
+              <div class="option-description">Design tokens and theme file</div>
+            </div>
+            <div class="option-card" data-option="project-structure">
+              <div class="option-title">📁 Project Structure</div>
+              <div class="option-description">Complete folder structure with files</div>
+            </div>
+          </div>
+        </div>
+        
         <div class="action-bar">
           <div class="button-group">
-            <button class="button success" onclick="generateFlowCode()" id="generateFlowBtn">
-              📱 Generate React Native Flow
+            <button class="button success" onclick="generateSelectedOption()" id="generateSelectedBtn">
+              🚀 Generate Selected
             </button>
-            <button class="button secondary" onclick="generateSelectedScreen()" id="generateScreenBtn" disabled>
+            <button class="button secondary" onclick="generateScreenCode()" id="generateScreenBtn" disabled>
               🎨 Generate Selected Screen
             </button>
             <button class="button outline" onclick="exportFlowTheme()" id="exportThemeBtn">
-              🎨 Export Flow Theme
+              📦 Download Package
             </button>
           </div>
         </div>
@@ -653,33 +1008,52 @@
     <div id="successMessage" class="success" style="display: none;"></div>
   </div>
   
-  <!-- Code Preview Modal -->
+  <!-- Enhanced Code Preview Modal with Multi-file Support -->
   <div id="codeModal" class="modal-overlay">
     <div class="modal">
       <div class="modal-header">
-        <h3 class="modal-title" id="modalTitle">Generated Code</h3>
+        <h3 class="modal-title" id="modalTitle">Generated Code Package</h3>
         <button class="modal-close" onclick="closeCodeModal()">&times;</button>
+      </div>
+      <div class="file-tabs" id="fileTabs">
+        <!-- File tabs will be populated here -->
       </div>
       <div class="modal-body">
         <div class="code-preview" id="codePreview"></div>
-        <div class="button-group" style="margin-top: 16px;">
-          <button class="button success" onclick="copyCode()">📋 Copy Code</button>
-          <button class="button secondary" onclick="downloadCode()">💾 Download File</button>
+        
+        <div class="export-options">
+          <div class="export-title">📦 Export Options</div>
+          <div class="export-grid">
+            <div class="export-option" onclick="copyCode()">
+              📋 Copy Current File
+            </div>
+            <div class="export-option" onclick="downloadCurrentFile()">
+              💾 Download File
+            </div>
+            <div class="export-option" onclick="downloadAllFiles()">
+              📁 Download All (.zip)
+            </div>
+            <div class="export-option" onclick="copyPackageStructure()">
+              📦 Copy Project Structure
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    // Global state management
+    // Enhanced global state management
     let currentState = {
       view: 'dashboard', // 'dashboard', 'flow-detail'
+      viewMode: 'grid', // 'grid', 'diagram'
       flows: [],
       selectedFlow: null,
       selectedScreen: null,
       detectedRoles: [],
       theme: null,
-      generatedCode: ''
+      generatedFiles: {},
+      selectedGenerationOption: 'complete-flow'
     };
     
     // View management
@@ -694,6 +1068,31 @@
       currentState.view = viewName;
       
       updateBreadcrumb();
+      updateViewToggle();
+    }
+    
+    function setViewMode(mode) {
+      currentState.viewMode = mode;
+      updateViewButtons();
+      
+      if (currentState.selectedFlow) {
+        if (mode === 'diagram') {
+          document.getElementById('flowDiagramSection').style.display = 'block';
+          generateFlowDiagram(currentState.selectedFlow);
+        } else {
+          document.getElementById('flowDiagramSection').style.display = 'none';
+        }
+      }
+    }
+    
+    function updateViewButtons() {
+      document.getElementById('gridViewBtn').classList.toggle('active', currentState.viewMode === 'grid');
+      document.getElementById('diagramViewBtn').classList.toggle('active', currentState.viewMode === 'diagram');
+    }
+    
+    function updateViewToggle() {
+      const toggle = document.getElementById('viewToggle');
+      toggle.style.display = currentState.view === 'flow-detail' ? 'flex' : 'none';
     }
     
     function updateBreadcrumb() {
@@ -750,6 +1149,23 @@
       }
     }
     
+    // Enhanced generation options
+    function setupGenerationOptions() {
+      const options = document.querySelectorAll('.option-card');
+      options.forEach(option => {
+        option.addEventListener('click', () => {
+          options.forEach(o => o.classList.remove('selected'));
+          option.classList.add('selected');
+          currentState.selectedGenerationOption = option.dataset.option;
+          
+          // Update button text
+          const btn = document.getElementById('generateSelectedBtn');
+          const optionTitle = option.querySelector('.option-title').textContent;
+          btn.textContent = `🚀 Generate ${optionTitle}`;
+        });
+      });
+    }
+    
     // Main actions
     function detectFlows() {
       showLoading('Analyzing flows and detecting user roles...');
@@ -770,6 +1186,10 @@
       
       showFlowDetail(flow);
       showView('flow-detail');
+      
+      if (currentState.viewMode === 'diagram') {
+        generateFlowDiagram(flow);
+      }
     }
     
     function selectScreen(screenName) {
@@ -794,21 +1214,54 @@
       document.getElementById('generateScreenBtn').disabled = false;
       
       updateBreadcrumb();
+      
+      // Update flow diagram selection
+      if (currentState.viewMode === 'diagram') {
+        updateDiagramSelection(screenName);
+      }
     }
     
-    function generateFlowCode() {
+    function generateSelectedOption() {
       if (!currentState.selectedFlow) return;
       
-      showLoading('Generating React Native flow code...');
+      const option = currentState.selectedGenerationOption;
+      
+      switch (option) {
+        case 'complete-flow':
+          generateCompleteFlowPackage();
+          break;
+        case 'individual-screen':
+          if (currentState.selectedScreen) {
+            generateScreenCode();
+          } else {
+            showError('Please select a screen first');
+          }
+          break;
+        case 'theme-only':
+          exportFlowTheme();
+          break;
+        case 'project-structure':
+          generateProjectStructure();
+          break;
+      }
+    }
+    
+    function generateCompleteFlowPackage() {
+      if (!currentState.selectedFlow) return;
+      
+      showLoading('Generating complete React Native flow package...');
       parent.postMessage({ 
         pluginMessage: { 
           type: 'generate-flow-code',
-          flowId: currentState.selectedFlow.id 
+          flowId: currentState.selectedFlow.id,
+          includeNavigation: true,
+          includeTheme: true,
+          includeTypes: true
         } 
       }, '*');
     }
     
-    function generateSelectedScreen() {
+    function generateScreenCode() {
       if (!currentState.selectedScreen || !currentState.selectedFlow) return;
       
       showLoading('Generating React Native screen code...');
@@ -817,6 +1270,18 @@
           type: 'generate-screen-code',
           flowId: currentState.selectedFlow.id,
           screenName: currentState.selectedScreen.name
+        } 
+      }, '*');
+    }
+    
+    function generateProjectStructure() {
+      if (!currentState.selectedFlow) return;
+      
+      showLoading('Generating project structure...');
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'generate-project-structure',
+          flowId: currentState.selectedFlow.id
         } 
       }, '*');
     }
@@ -833,7 +1298,7 @@
       }, '*');
     }
     
-    // Display functions
+    // Enhanced display functions
     function displayFlows(flowsData) {
       currentState.flows = flowsData.flows || [];
       currentState.detectedRoles = flowsData.userRoles || [];
@@ -897,7 +1362,7 @@
             </div>
             <div class="flow-meta-item">
               <span>⏱️</span>
-              <span>~${flow.estimatedDuration || 5} min</span>
+              <span>~${Math.round((flow.estimatedDuration || 300) / 60)} min</span>
             </div>
           </div>
           <div class="flow-description">
@@ -938,12 +1403,16 @@
       // Update screen count
       screenCount.textContent = `${flow.screens.length} screens`;
       
-      // Generate screen cards
+      // Generate enhanced screen cards
       screensGrid.innerHTML = flow.screens.map((screen, index) => `
         <div class="screen-card" data-screen="${screen.name}" onclick="selectScreen('${screen.name}')">
           <div class="screen-preview">
+            <div class="screen-mockup ${screen.deviceType}">
+              <div class="screen-content">
+                ${generateScreenPreview(screen)}
+              </div>
+            </div>
             <div class="screen-device-indicator">${getDeviceIcon(screen.deviceType)}</div>
-            <span>Screen Preview</span>
           </div>
           <div class="screen-info">
             <h4 class="screen-name">${screen.name}</h4>
@@ -951,45 +1420,373 @@
               <span>${screen.width}×${screen.height}</span>
               <span>${screen.components?.length || 0} components</span>
             </div>
+            <div class="component-analysis">
+              <div class="component-tags">
+                ${generateComponentTags(screen.components)}
+              </div>
+            </div>
           </div>
         </div>
       `).join('');
     }
     
-    function showCodeModal(title, code, filename = 'code.tsx') {
+    // Enhanced screen preview generation
+    function generateScreenPreview(screen) {
+      if (!screen.components || screen.components.length === 0) {
+        return '<div style="padding: 20px; text-align: center; color: #999; font-size: 10px;">No components</div>';
+      }
+      
+      let html = '';
+      const componentCounts = {};
+      
+      // Count component types
+      screen.components.forEach(comp => {
+        const type = comp.semanticType || 'element';
+        componentCounts[type] = (componentCounts[type] || 0) + 1;
+      });
+      
+      // Generate preview elements based on component types
+      if (componentCounts.navigation || componentCounts.header) {
+        html += '<div class="component-preview header"></div>';
+      }
+      
+      if (componentCounts.heading) {
+        html += '<div class="component-preview text" style="height: 8px; width: 70%;"></div>';
+      }
+      
+      if (componentCounts.input) {
+        html += '<div class="component-preview input"></div>';
+        html += '<div class="component-preview input"></div>';
+      }
+      
+      if (componentCounts.button) {
+        html += '<div class="component-preview button"></div>';
+      }
+      
+      if (componentCounts.card) {
+        html += '<div class="component-preview card"></div>';
+        if (componentCounts.card > 1) {
+          html += '<div class="component-preview card"></div>';
+        }
+      }
+      
+      // Add some text elements
+      if (componentCounts.text || componentCounts.label) {
+        html += '<div class="component-preview text" style="height: 4px; width: 90%;"></div>';
+        html += '<div class="component-preview text" style="height: 4px; width: 60%;"></div>';
+      }
+      
+      return html || '<div class="component-preview text" style="height: 6px; width: 80%;"></div>';
+    }
+    
+    function generateComponentTags(components) {
+      if (!components || components.length === 0) return '';
+      
+      const types = new Set();
+      components.forEach(comp => {
+        if (comp.semanticType) {
+          types.add(comp.semanticType);
+        }
+      });
+      
+      return Array.from(types).slice(0, 4).map(type => 
+        `<span class="component-tag ${type}">${type}</span>`
+      ).join('');
+    }
+    
+    // Flow diagram generation
+    function generateFlowDiagram(flow) {
+      const diagram = document.getElementById('flowDiagram');
+      diagram.innerHTML = '';
+      
+      const screens = flow.screens;
+      if (screens.length === 0) return;
+      
+      const nodeWidth = 80;
+      const nodeHeight = 30;
+      const containerWidth = diagram.offsetWidth - 40;
+      const containerHeight = diagram.offsetHeight - 40;
+      
+      // Calculate positions for screens
+      const positions = calculateFlowPositions(screens, containerWidth, containerHeight, nodeWidth, nodeHeight);
+      
+      // Create nodes
+      screens.forEach((screen, index) => {
+        const node = document.createElement('div');
+        node.className = 'flow-node';
+        node.textContent = screen.name;
+        node.style.left = positions[index].x + 'px';
+        node.style.top = positions[index].y + 'px';
+        node.style.width = nodeWidth + 'px';
+        node.style.height = nodeHeight + 'px';
+        node.dataset.screen = screen.name;
+        
+        node.addEventListener('click', () => {
+          selectScreen(screen.name);
+          updateDiagramSelection(screen.name);
+        });
+        
+        diagram.appendChild(node);
+      });
+      
+      // Create connections
+      for (let i = 0; i < screens.length - 1; i++) {
+        createConnection(diagram, positions[i], positions[i + 1], nodeWidth, nodeHeight);
+      }
+    }
+    
+    function calculateFlowPositions(screens, containerWidth, containerHeight, nodeWidth, nodeHeight) {
+      const positions = [];
+      const screenCount = screens.length;
+      
+      if (screenCount === 1) {
+        positions.push({
+          x: (containerWidth - nodeWidth) / 2,
+          y: (containerHeight - nodeHeight) / 2
+        });
+      } else if (screenCount <= 3) {
+        // Horizontal layout
+        const spacing = (containerWidth - (screenCount * nodeWidth)) / (screenCount + 1);
+        screens.forEach((_, index) => {
+          positions.push({
+            x: spacing + (index * (nodeWidth + spacing)),
+            y: (containerHeight - nodeHeight) / 2
+          });
+        });
+      } else {
+        // Grid layout
+        const cols = Math.ceil(Math.sqrt(screenCount));
+        const rows = Math.ceil(screenCount / cols);
+        const spacingX = (containerWidth - (cols * nodeWidth)) / (cols + 1);
+        const spacingY = (containerHeight - (rows * nodeHeight)) / (rows + 1);
+        
+        screens.forEach((_, index) => {
+          const row = Math.floor(index / cols);
+          const col = index % cols;
+          positions.push({
+            x: spacingX + (col * (nodeWidth + spacingX)),
+            y: spacingY + (row * (nodeHeight + spacingY))
+          });
+        });
+      }
+      
+      return positions;
+    }
+    
+    function createConnection(container, pos1, pos2, nodeWidth, nodeHeight) {
+      const x1 = pos1.x + nodeWidth / 2;
+      const y1 = pos1.y + nodeHeight / 2;
+      const x2 = pos2.x + nodeWidth / 2;
+      const y2 = pos2.y + nodeHeight / 2;
+      
+      const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+      const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+      
+      const connection = document.createElement('div');
+      connection.className = 'flow-connection';
+      connection.style.width = length + 'px';
+      connection.style.left = x1 + 'px';
+      connection.style.top = y1 + 'px';
+      connection.style.transformOrigin = '0 50%';
+      connection.style.transform = `rotate(${angle}deg)`;
+      
+      container.appendChild(connection);
+      
+      // Add arrow
+      const arrow = document.createElement('div');
+      arrow.className = 'flow-arrow';
+      arrow.style.left = (x2 - 6) + 'px';
+      arrow.style.top = (y2 - 4) + 'px';
+      
+      container.appendChild(arrow);
+    }
+    
+    function updateDiagramSelection(screenName) {
+      document.querySelectorAll('.flow-node').forEach(node => {
+        node.classList.remove('selected');
+        if (node.dataset.screen === screenName) {
+          node.classList.add('selected');
+        }
+      });
+    }
+    
+    // Enhanced modal with multi-file support
+    function showCodeModal(title, files, activeFile = null) {
       document.getElementById('modalTitle').textContent = title;
-      document.getElementById('codePreview').textContent = code;
+      
+      currentState.generatedFiles = files;
+      
+      // Setup file tabs
+      const fileTabs = document.getElementById('fileTabs');
+      const fileNames = Object.keys(files);
+      
+      if (fileNames.length > 1) {
+        fileTabs.style.display = 'flex';
+        fileTabs.innerHTML = fileNames.map((fileName, index) => `
+          <button class="file-tab ${index === 0 || fileName === activeFile ? 'active' : ''}" 
+                  onclick="switchFileTab('${fileName}')" 
+                  data-file="${fileName}">
+            ${getFileIcon(fileName)} ${fileName}
+          </button>
+        `).join('');
+      } else {
+        fileTabs.style.display = 'none';
+      }
+      
+      // Show first file or active file
+      const firstFile = activeFile || fileNames[0];
+      if (firstFile) {
+        switchFileTab(firstFile);
+      }
+      
       document.getElementById('codeModal').style.display = 'flex';
-      currentState.generatedCode = code;
-      currentState.currentFilename = filename;
+    }
+    
+    function switchFileTab(fileName) {
+      const content = currentState.generatedFiles[fileName];
+      if (!content) return;
+      
+      // Update active tab
+      document.querySelectorAll('.file-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.dataset.file === fileName) {
+          tab.classList.add('active');
+        }
+      });
+      
+      // Update content with basic syntax highlighting
+      const codePreview = document.getElementById('codePreview');
+      codePreview.innerHTML = applySyntaxHighlighting(content, getFileExtension(fileName));
+      
+      currentState.currentFile = fileName;
+    }
+    
+    function getFileIcon(fileName) {
+      const ext = getFileExtension(fileName);
+      const icons = {
+        'tsx': '⚛️',
+        'ts': '📝',
+        'js': '📄',
+        'json': '📋',
+        'md': '📖',
+        'zip': '📦'
+      };
+      return icons[ext] || '📄';
+    }
+    
+    function getFileExtension(fileName) {
+      return fileName.split('.').pop().toLowerCase();
+    }
+    
+    function applySyntaxHighlighting(code, extension) {
+      if (!['tsx', 'ts', 'js', 'json'].includes(extension)) {
+        return escapeHtml(code);
+      }
+      
+      let highlighted = escapeHtml(code);
+      
+      // Basic syntax highlighting patterns
+      const patterns = [
+        // Keywords
+        { regex: /\b(import|export|from|interface|type|class|function|const|let|var|if|else|for|while|return|async|await)\b/g, class: 'code-keyword' },
+        // Strings
+        { regex: /(["'`])((?:\\.|(?!\1)[^\\])*?)\1/g, class: 'code-string' },
+        // Comments
+        { regex: /\/\/.*$/gm, class: 'code-comment' },
+        { regex: /\/\*[\s\S]*?\*\//g, class: 'code-comment' },
+        // Functions
+        { regex: /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(?=\()/g, class: 'code-function' },
+      ];
+      
+      patterns.forEach(pattern => {
+        highlighted = highlighted.replace(pattern.regex, `<span class="${pattern.class}">$&</span>`);
+      });
+      
+      return highlighted;
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
     }
     
     function closeCodeModal() {
       document.getElementById('codeModal').style.display = 'none';
     }
     
+    // Enhanced export functions
     function copyCode() {
-      navigator.clipboard.writeText(currentState.generatedCode).then(() => {
-        showSuccess('✅ Code copied to clipboard!');
+      const fileName = currentState.currentFile;
+      const content = currentState.generatedFiles[fileName];
+      if (content) {
+        navigator.clipboard.writeText(content).then(() => {
+          showSuccess(`✅ ${fileName} copied to clipboard!`);
+        }).catch(() => {
+          showError('❌ Failed to copy code');
+        });
+      }
+    }
+    
+    function downloadCurrentFile() {
+      const fileName = currentState.currentFile;
+      const content = currentState.generatedFiles[fileName];
+      if (content) {
+        downloadFile(content, fileName);
+        showSuccess(`✅ Downloaded ${fileName}`);
+      }
+    }
+    
+    function downloadAllFiles() {
+      // In a real implementation, this would create a zip file
+      // For now, we'll download files individually
+      Object.entries(currentState.generatedFiles).forEach(([fileName, content]) => {
+        setTimeout(() => downloadFile(content, fileName), 100);
+      });
+      showSuccess(`✅ Downloaded ${Object.keys(currentState.generatedFiles).length} files`);
+    }
+    
+    function copyPackageStructure() {
+      const structure = generatePackageStructure();
+      navigator.clipboard.writeText(structure).then(() => {
+        showSuccess('✅ Project structure copied to clipboard!');
       }).catch(() => {
-        showError('❌ Failed to copy code');
+        showError('❌ Failed to copy structure');
       });
     }
     
-    function downloadCode() {
+    function generatePackageStructure() {
+      const files = Object.keys(currentState.generatedFiles);
+      const structure = `
+📦 React Native Flow Package
+├── 📁 src/
+│   ├── 📁 screens/
+${files.filter(f => f.includes('Screen')).map(f => `│   │   └── 📄 ${f}`).join('\n')}
+│   ├── 📁 navigation/
+${files.filter(f => f.includes('Navigator')).map(f => `│   │   └── 📄 ${f}`).join('\n')}
+│   ├── 📁 theme/
+${files.filter(f => f.includes('theme')).map(f => `│   │   └── 📄 ${f}`).join('\n')}
+│   └── 📁 types/
+${files.filter(f => f.includes('types')).map(f => `│       └── 📄 ${f}`).join('\n')}
+└── 📄 package.json
+      `.trim();
+      
+      return structure;
+    }
+    
+    function downloadFile(content, fileName) {
       try {
-        const blob = new Blob([currentState.generatedCode], { type: 'text/plain' });
+        const blob = new Blob([content], { type: 'text/plain' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = currentState.currentFilename || 'generated-code.tsx';
+        a.download = fileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-        showSuccess(`✅ Downloaded ${currentState.currentFilename}`);
       } catch (error) {
-        showError('❌ Failed to download file');
+        showError(`❌ Failed to download ${fileName}`);
       }
     }
     
@@ -1044,7 +1841,13 @@
       }, 3000);
     }
     
-    // Message handling from plugin
+    // Initialize the UI
+    document.addEventListener('DOMContentLoaded', function() {
+      setupGenerationOptions();
+      updateViewButtons();
+    });
+    
+    // Enhanced message handling from plugin
     onmessage = function(event) {
       const msg = event.data.pluginMessage;
       
@@ -1063,28 +1866,49 @@
         case 'tokens-extracted':
         case 'extraction-complete':
           hideLoading();
-          showCodeModal('Design Tokens & Theme', msg.data.fileContent, 'theme.ts');
+          showCodeModal('Design Tokens & Theme', {
+            'theme.ts': msg.data.fileContent || msg.data.themeFileContent
+          });
           showSuccess('🎉 Design tokens extracted!');
           break;
           
         case 'flow-code-generated':
           hideLoading();
           showView('flow-detail');
-          showCodeModal('React Native Flow Code', msg.data.code, `${currentState.selectedFlow?.name || 'Flow'}.tsx`);
+          
+          // Handle multiple files if provided
+          if (msg.data.files) {
+            showCodeModal('React Native Flow Package', msg.data.files);
+          } else {
+            showCodeModal('React Native Flow Code', {
+              [`${currentState.selectedFlow?.name || 'Flow'}.tsx`]: msg.data.code
+            });
+          }
           showSuccess('🎉 Flow code generated!');
           break;
           
         case 'screen-code-generated':
           hideLoading();
           showView('flow-detail');
-          showCodeModal('React Native Screen Code', msg.data.code, `${currentState.selectedScreen?.name || 'Screen'}.tsx`);
+          showCodeModal('React Native Screen Code', {
+            [`${currentState.selectedScreen?.name || 'Screen'}.tsx`]: msg.data.code
+          });
           showSuccess('🎉 Screen code generated!');
           break;
           
         case 'flow-theme-exported':
           hideLoading();
-          showCodeModal('Flow Theme', msg.data.themeContent, 'flow-theme.ts');
+          showCodeModal('Flow Theme Package', {
+            'theme.ts': msg.data.themeContent,
+            'README.md': generateThemeReadme(msg.data)
+          });
           showSuccess('🎉 Flow theme exported!');
+          break;
+          
+        case 'project-structure-generated':
+          hideLoading();
+          showCodeModal('Complete Project Structure', msg.data.files || {});
+          showSuccess('🎉 Project structure generated!');
           break;
           
         case 'error':
@@ -1094,6 +1918,47 @@
           break;
       }
     };
-  </script>
-</body>
-</html>
+    
+    function generateThemeReadme(data) {
+      return `# Flow Theme Package
+
+Generated from Figma design: **${data.flowName || 'Unknown Flow'}**
+
+## Installation
+
+\`\`\`bash
+npm install react-native-vector-icons
+# iOS additional setup required for icons
+cd ios && pod install
+\`\`\`
+
+## Usage
+
+\`\`\`typescript
+import theme from './theme';
+
+// Use in your components
+<View style={{
+  backgroundColor: theme.COLORS.primary,
+  padding: theme.SPACING.md,
+  borderRadius: theme.BORDER_RADIUS.lg
+}}>
+  <Text style={{
+    fontSize: theme.TYPOGRAPHY.fontSize.lg,
+    color: theme.COLORS.white
+  }}>
+    Themed Component
+  </Text>
+</View>
+\`\`\`
+
+## Features
+
+- 🎨 Complete design token system
+- 📱 Responsive scaling utilities  
+- 🎯 Platform-specific adjustments
+- 🔧 Helper functions for easy usage
+
+Generated on: ${new Date(data.timestamp).toLocaleString()}
+`;
+    }
