@@ -1,5 +1,6 @@
 // src/core/types.ts
 // Core type definitions for the Figma React Native Bridge Plugin
+// Added missing PluginState interface
 
 export interface FigmaNode {
   id: string;
@@ -28,6 +29,17 @@ export interface FigmaNode {
   textAlignHorizontal?: string;
   lineHeight?: any;
   parent?: FigmaNode;
+}
+
+// ADDED: Missing PluginState interface used in main.ts
+export interface PluginState {
+  currentSelection: any[];
+  detectedFlows: FlowStructure[];
+  extractedTokens: ExtractedValues | null;
+  isProcessing: boolean;
+  currentPage?: string;
+  lastOperation?: string;
+  operationStartTime?: number;
 }
 
 export interface ExtractedValues {
@@ -111,8 +123,8 @@ export interface ScreenStructure {
   name: string;
   width: number;
   height: number;
-  x?: number;  // ADD THIS LINE
-  y?: number;  // ADD THIS LINE
+  x?: number;
+  y?: number;
   page?: string;
   backgroundColor?: string;
   components: ComponentStructure[];
@@ -249,7 +261,7 @@ export interface FlowStructure {
   parentFlow?: string;
   subFlows?: string[];
   estimatedDuration?: number; // minutes to complete flow
-  criticalPath?: boolean; // ADD THIS LINE
+  criticalPath?: boolean;
 }
 
 // Enhanced screen structure with flow context
@@ -318,4 +330,50 @@ export interface FlowAwareExtractionResult extends ExtractionResult {
     navigationPatterns: number;
     overallScore: number;
   };
+}
+
+// ADDED: Plugin configuration and state types
+export interface PluginConfiguration {
+  ui: {
+    width: number;
+    height: number;
+    title: string;
+  };
+  extraction: {
+    maxNodes: number;
+    maxDepth: number;
+    timeout: number;
+  };
+  logging: {
+    level: 'debug' | 'info' | 'warn' | 'error';
+    maxLogs: number;
+  };
+}
+
+// ADDED: Message handling types
+export interface PluginUIMessage {
+  type: string;
+  data?: any;
+  flowId?: string;
+  screenName?: string;
+  [key: string]: any;
+}
+
+// ADDED: Operation status tracking
+export interface OperationStatus {
+  isRunning: boolean;
+  operation: string;
+  progress: number;
+  message: string;
+  startTime: number;
+  error?: string;
+}
+
+// ADDED: Selection validation result
+export interface SelectionValidation {
+  isValid: boolean;
+  error?: string;
+  frameCount?: number;
+  componentCount?: number;
+  warnings?: string[];
 }

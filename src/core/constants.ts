@@ -1,6 +1,6 @@
 // src/core/constants.ts
 // Complete constants for the Figma React Native Bridge Plugin
-// Validated against existing codebase usage
+// Updated with missing message types from main.ts
 
 // ============================================================================
 // MESSAGE TYPES - Plugin to UI Communication
@@ -27,12 +27,20 @@ export const MESSAGE_TYPES = {
   SCREEN_CODE_GENERATED: 'screen-code-generated',
   FLOW_THEME_EXPORTED: 'flow-theme-exported',
   
+  // Project structure generation (ADDED - used in main.ts)
+  GENERATE_PROJECT_STRUCTURE: 'generate-project-structure',
+  
   // System messages (EXISTING - validated from main.ts)
   PROGRESS_UPDATE: 'progress-update',
   ERROR: 'error',
   SUCCESS: 'success',
   CLOSE: 'close',
   CRITICAL_ERROR: 'critical-error',
+  
+  // User interaction messages (ADDED - used in main.ts)
+  REFRESH_SELECTION: 'refresh-selection',
+  CANCEL_OPERATION: 'cancel-operation',
+  CLOSE_PLUGIN: 'close-plugin',
   
   // Logging system (EXISTING - validated from main.ts)
   GET_LOGS: 'get-logs',
@@ -94,6 +102,14 @@ export const UI_MESSAGE_TYPES = {
   GENERATE_FLOW_CODE: 'generate-flow-code',
   GENERATE_SCREEN_CODE: 'generate-screen-code',
   EXPORT_FLOW_THEME: 'export-flow-theme',
+  
+  // Project structure generation (ADDED - used in main.ts)
+  GENERATE_PROJECT_STRUCTURE: 'generate-project-structure',
+  
+  // User interaction actions (ADDED - used in main.ts)
+  REFRESH_SELECTION: 'refresh-selection',
+  CANCEL_OPERATION: 'cancel-operation',
+  CLOSE_PLUGIN: 'close-plugin',
   
   // Responses (EXISTING - validated from ui.html)
   FLOWS_DETECTED: 'flows-detected',
