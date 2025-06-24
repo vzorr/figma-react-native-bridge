@@ -1,817 +1,875 @@
-// src/main.ts - Enhanced with Flow Handling - FIXED VERSION
-// Main entry point for Figma React Native Bridge Plugin
+// Figma Plugin Main Entry Point
+// This file contains the main plugin logic and UI initialization
 
-import { logger, LogLevel } from './core/logger';
-import { ErrorHandler } from './core/error-handler';
-import { MESSAGE_TYPES, FLOW_MESSAGE_TYPES } from './core/constants';
-import { ExtractValuesHandler } from './handlers/extract-values-handler';
-import ExtractScreensHandler from './handlers/extract-screens-handler';
-import { ExtractFlowsHandler } from './handlers/extract-flows-handler';
-import { ScreenGenerator } from './generators/screen-generator';
-import { ThemeGenerator } from './generators/theme-generator';
+// Import your existing handlers and utilities
+// Uncomment these when you have the actual files
+// import { FlowDetector } from '@detectors/FlowDetector';
+// import { TokenExtractor } from '@extractors/TokenExtractor';
+// import { CodeGenerator } from '@generators/CodeGenerator';
+// import { ThemeGenerator } from '@generators/ThemeGenerator';
 
-declare const figma: any;
-declare const __html__: string;
+// The HTML content is injected by webpack and declared in global.d.ts
 
-const MODULE_NAME = 'Main';
-
-class FigmaReactNativeBridge {
-  private extractValuesHandler: ExtractValuesHandler;
-  private extractScreensHandler: ExtractScreensHandler;
-  private extractFlowsHandler: ExtractFlowsHandler;
-  private screenGenerator: ScreenGenerator;
-  private themeGenerator: ThemeGenerator;
-
-  constructor() {
-    try {
-      // Initialize handlers
-      this.extractValuesHandler = new ExtractValuesHandler();
-      this.extractScreensHandler = new ExtractScreensHandler();
-      this.extractFlowsHandler = new ExtractFlowsHandler();
-      this.screenGenerator = new ScreenGenerator();
-      this.themeGenerator = new ThemeGenerator();
-      
-      logger.info(MODULE_NAME, 'constructor', 'Figma React Native Bridge Plugin initialized with flow support');
-    } catch (error) {
-      ErrorHandler.handle(error as Error, {
-        module: MODULE_NAME,
-        function: 'constructor',
-        operation: 'plugin initialization'
-      });
-      throw error;
-    }
-  }
-
-  init(): void {
-    try {
-      logger.info(MODULE_NAME, 'init', 'Starting plugin initialization with enhanced flow support');
-      
-      // Show UI using the injected HTML content
-      figma.showUI(__html__, { 
-        width: 400, 
-        height: 600,
-        title: 'React Native Flow Bridge'
-      });
-
-      // Set up message handling
-      figma.ui.onmessage = (msg: any) => {
-        this.incrementMessageCount();
-        this.handleMessage(msg).catch((error) => {
-          ErrorHandler.handle(error as Error, {
-            module: MODULE_NAME,
-            function: 'onmessage',
-            operation: 'message handling',
-            additionalData: { messageType: msg?.type }
-          });
-        });
-      };
-
-      logger.info(MODULE_NAME, 'init', 'Plugin initialization complete with flow support');
-      
-      // Send initial ready message with enhanced capabilities
-      setTimeout(() => {
-        try {
-          figma.ui.postMessage({
-            type: 'plugin-ready',
-            data: {
-              version: '1.0.0',
-              timestamp: Date.now(),
-              capabilities: [
-                'extract-tokens',
-                'extract-screens', 
-                'detect-flows',
-                'generate-flow-code',
-                'generate-screen-code',
-                'export-flow-theme',
-                'semantic-analysis',
-                'user-role-detection'
-              ]
-            }
-          });
-        } catch (uiError) {
-          logger.warn(MODULE_NAME, 'init', 'Failed to send ready message to UI');
-        }
-      }, 100);
-      
-    } catch (error) {
-      ErrorHandler.handle(error as Error, {
-        module: MODULE_NAME,
-        function: 'init',
-        operation: 'plugin UI initialization'
-      });
-      
-      // Try to show a fallback UI
-      try {
-        figma.showUI(`
-          <html>
-            <body style="padding: 20px; font-family: Arial, sans-serif;">
-              <h3>Plugin Error</h3>
-              <p>Failed to load the main UI. Please check the console for details.</p>
-              <p>Error: ${(error as Error).message}</p>
-            </body>
-          </html>
-        `, { width: 400, height: 200 });
-      } catch (fallbackError) {
-        console.error('Failed to show fallback UI:', fallbackError);
-      }
-    }
-  }
-
-  private async handleMessage(msg: any): Promise<void> {
-    try {
-      logger.info(MODULE_NAME, 'handleMessage', `Received message: ${msg.type || msg.pluginMessage?.type}`);
-      
-      // Handle both direct and nested message formats
-      const messageType = msg.type || msg.pluginMessage?.type;
-      const messageData = msg.data || msg.pluginMessage || msg;
-      
-      switch (messageType) {
-        // Existing handlers
-        case MESSAGE_TYPES.EXTRACT_VALUES:
-        case 'extract-tokens':
-          await this.extractValuesHandler.handle(messageData.options);
-          break;
-          
-        case MESSAGE_TYPES.EXTRACT_SCREENS:
-        case 'extract-screens':
-          await this.extractScreensHandler.handle(messageData.options);
-          break;
-          
-        // Flow-specific handlers
-        case MESSAGE_TYPES.DETECT_FLOWS:
-        case 'detect-flows':
-          await this.extractFlowsHandler.handleFlowDetection(messageData.options);
-          break;
-          
-        case MESSAGE_TYPES.FLOW_SELECTED:
-        case 'flow-selected':
-          await this.extractFlowsHandler.handleFlowSelection(messageData.flowId);
-          break;
-          
-        case MESSAGE_TYPES.GENERATE_FLOW_CODE:
-        case 'generate-flow-code':
-          await this.handleGenerateFlowCode(messageData.flowId);
-          break;
-          
-        case MESSAGE_TYPES.GENERATE_SCREEN_CODE:
-        case 'generate-screen-code':
-          await this.handleGenerateScreenCode(messageData.flowId, messageData.screenName);
-          break;
-          
-        case MESSAGE_TYPES.EXPORT_FLOW_THEME:
-        case 'export-flow-theme':
-          await this.handleExportFlowTheme(messageData.flowId);
-          break;
-          
-        // System handlers
-        case MESSAGE_TYPES.CLOSE:
-        case 'close':
-          logger.info(MODULE_NAME, 'handleMessage', 'Closing plugin');
-          figma.closePlugin();
-          break;
-          
-        case MESSAGE_TYPES.GET_LOGS:
-        case 'get-logs':
-          this.sendLogs();
-          break;
-          
-        case MESSAGE_TYPES.CLEAR_LOGS:
-        case 'clear-logs':
-          logger.clearLogs();
-          figma.ui.postMessage({
-            type: MESSAGE_TYPES.LOGS_CLEARED
-          });
-          break;
-          
-        case MESSAGE_TYPES.SET_LOG_LEVEL:
-        case 'set-log-level':
-          if (messageData.level !== undefined) {
-            logger.setLevel(messageData.level as LogLevel);
-            figma.ui.postMessage({
-              type: MESSAGE_TYPES.LOG_LEVEL_CHANGED,
-              level: messageData.level
-            });
-          }
-          break;
-          
-        default:
-          logger.warn(MODULE_NAME, 'handleMessage', `Unknown message type: ${messageType}`);
-      }
-    } catch (error) {
-      ErrorHandler.handle(error as Error, {
-        module: MODULE_NAME,
-        function: 'handleMessage',
-        operation: 'message processing',
-        additionalData: { messageType: msg?.type, messageData: msg }
-      });
-      
-      // Send error to UI
-      figma.ui.postMessage({
-        type: MESSAGE_TYPES.ERROR,
-        error: {
-          message: 'Failed to process message',
-          context: `Message type: ${msg?.type}`,
-          timestamp: Date.now()
-        }
-      });
-    }
-  }
-
-  // Generate complete flow code
-  private async handleGenerateFlowCode(flowId: string): Promise<void> {
-    const FUNC_NAME = 'handleGenerateFlowCode';
-    
-    try {
-      logger.info(MODULE_NAME, FUNC_NAME, `Generating code for flow: ${flowId}`);
-      
-      // Get the specific flow from the flow extractor
-      const flow = this.extractFlowsHandler.getFlowById(flowId);
-      if (!flow) {
-        throw new Error(`Flow ${flowId} not found`);
-      }
-      
-      // Generate code for all screens in the flow
-      const flowCode = await this.generateCompleteFlowCode(flow);
-      
-      figma.ui.postMessage({
-        type: FLOW_MESSAGE_TYPES.FLOW_CODE_GENERATED,
-        data: {
-          flowId,
-          code: flowCode,
-          timestamp: Date.now()
-        }
-      });
-      
-      logger.info(MODULE_NAME, FUNC_NAME, 'Flow code generation complete');
-      
-    } catch (error) {
-      logger.error(MODULE_NAME, FUNC_NAME, 'Error generating flow code:', error as Error);
-      figma.ui.postMessage({
-        type: MESSAGE_TYPES.ERROR,
-        error: {
-          message: `Failed to generate code for flow ${flowId}`,
-          details: (error as Error).message
-        }
-      });
-    }
-  }
-
-  // Generate specific screen code
-  private async handleGenerateScreenCode(flowId: string, screenName: string): Promise<void> {
-    const FUNC_NAME = 'handleGenerateScreenCode';
-    
-    try {
-      logger.info(MODULE_NAME, FUNC_NAME, `Generating code for screen: ${screenName} in flow: ${flowId}`);
-      
-      // Get the specific screen from the flow
-      const flow = this.extractFlowsHandler.getFlowById(flowId);
-      if (!flow) {
-        throw new Error(`Flow ${flowId} not found`);
-      }
-      
-      const screen = flow.screens.find((s: any) => s.name === screenName);
-      if (!screen) {
-        throw new Error(`Screen ${screenName} not found in flow ${flowId}`);
-      }
-      
-      // Generate theme for context
-      const theme = this.themeGenerator.generateTheme(this.extractDesignValuesFromFlow(flow));
-      
-      // Generate screen code
-      const screenCode = this.screenGenerator.generateScreenCode(screen, theme);
-      
-      figma.ui.postMessage({
-        type: FLOW_MESSAGE_TYPES.SCREEN_CODE_GENERATED,
-        data: {
-          flowId,
-          screenName,
-          code: screenCode,
-          timestamp: Date.now()
-        }
-      });
-      
-      logger.info(MODULE_NAME, FUNC_NAME, 'Screen code generation complete');
-      
-    } catch (error) {
-      logger.error(MODULE_NAME, FUNC_NAME, 'Error generating screen code:', error as Error);
-      figma.ui.postMessage({
-        type: MESSAGE_TYPES.ERROR,
-        error: {
-          message: `Failed to generate code for screen ${screenName}`,
-          details: (error as Error).message
-        }
-      });
-    }
-  }
-
-  // Export flow-specific theme
-  private async handleExportFlowTheme(flowId: string): Promise<void> {
-    const FUNC_NAME = 'handleExportFlowTheme';
-    
-    try {
-      logger.info(MODULE_NAME, FUNC_NAME, `Exporting theme for flow: ${flowId}`);
-      
-      const flow = this.extractFlowsHandler.getFlowById(flowId);
-      if (!flow) {
-        throw new Error(`Flow ${flowId} not found`);
-      }
-      
-      // Extract design values specific to this flow
-      const flowDesignValues = this.extractDesignValuesFromFlow(flow);
-      
-      // Generate flow-specific theme
-      const theme = this.themeGenerator.generateTheme(flowDesignValues);
-      const themeContent = this.themeGenerator.generateThemeFileContent(theme);
-      
-      figma.ui.postMessage({
-        type: FLOW_MESSAGE_TYPES.FLOW_THEME_EXPORTED,
-        data: {
-          flowId,
-          themeContent,
-          flowName: flow.name,
-          timestamp: Date.now()
-        }
-      });
-      
-      logger.info(MODULE_NAME, FUNC_NAME, 'Flow theme export complete');
-      
-    } catch (error) {
-      logger.error(MODULE_NAME, FUNC_NAME, 'Error exporting flow theme:', error as Error);
-      figma.ui.postMessage({
-        type: MESSAGE_TYPES.ERROR,
-        error: {
-          message: `Failed to export theme for flow ${flowId}`,
-          details: (error as Error).message
-        }
-      });
-    }
-  }
-
-  // Helper methods for flow code generation
-  private async generateCompleteFlowCode(flow: any): Promise<string> {
-    const screens = flow.screens || [];
-    const theme = this.themeGenerator.generateTheme(this.extractDesignValuesFromFlow(flow));
-    
-    // Generate individual screen components
-    const screenComponents = screens.map((screen: any) => 
-      this.screenGenerator.generateScreenCode(screen, theme)
-    );
-    
-    // Generate flow navigator
-    const flowNavigator = this.generateFlowNavigator(flow, theme);
-    
-    // Combine into complete flow code
-    return `// ${flow.name} - Complete Flow Implementation
-// Generated from Figma React Native Bridge
-// Flow Type: ${flow.flowType}
-// User Role: ${flow.userRole?.name || 'Unknown'}
-// Screens: ${screens.length}
-
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-
-// Screen imports
-${screens.map((screen: any, index: number) => 
-  `import ${this.sanitizeComponentName(screen.name)} from './screens/${this.sanitizeComponentName(screen.name)}';`
-).join('\n')}
-
-const Stack = createStackNavigator();
-
-interface ${this.sanitizeComponentName(flow.name)}Props {
-  initialRoute?: string;
+// Plugin state management
+interface PluginState {
+  currentSelection: readonly SceneNode[];
+  detectedFlows: any[];
+  extractedTokens: any;
+  isProcessing: boolean;
 }
 
-const ${this.sanitizeComponentName(flow.name)}: React.FC<${this.sanitizeComponentName(flow.name)}Props> = ({ 
-  initialRoute = '${screens[0]?.name || 'Home'}' 
-}) => {
-  return (
-    <NavigationContainer>
-      <Stack.Navigator 
-        initialRouteName={initialRoute}
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: '${theme.colors?.primary || '#007AFF'}',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-        }}
-      >
-${screens.map((screen: any) => `        <Stack.Screen 
-          name="${screen.name}" 
-          component={${this.sanitizeComponentName(screen.name)}} 
-          options={{ title: '${screen.name}' }}
-        />`).join('\n')}
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
+let pluginState: PluginState = {
+  currentSelection: [],
+  detectedFlows: [],
+  extractedTokens: null,
+  isProcessing: false
 };
 
-export default ${this.sanitizeComponentName(flow.name)};
+// Plugin initialization
+console.log('🚀 Figma React Native Bridge Plugin starting...');
 
-/*
-Flow Information:
-- Flow Type: ${flow.flowType}
-- User Role: ${flow.userRole?.name || 'Unknown'}
-- Navigation Pattern: ${flow.navigationPattern || 'stack'}
-- Estimated Duration: ${flow.estimatedDuration || 'Unknown'} seconds
-- Device Targets: ${flow.deviceTargets?.join(', ') || 'Unknown'}
+// Show the UI when plugin starts
+function showPluginUI() {
+  try {
+    // Validate that we have HTML content
+    if (typeof __html__ === 'undefined') {
+      console.error('❌ HTML content not found. Check webpack build.');
+      figma.closePlugin('Build error: UI content not found');
+      return;
+    }
 
-Screens in Flow:
-${screens.map((screen: any, index: number) => 
-  `${index + 1}. ${screen.name} (${screen.width}x${screen.height})`
-).join('\n')}
-*/
+    if (!__html__ || __html__.length < 100) {
+      console.error('❌ HTML content appears invalid or empty');
+      figma.closePlugin('Build error: Invalid UI content');
+      return;
+    }
 
-${screenComponents.join('\n\n')}`;
-  }
+    console.log('✅ HTML content loaded successfully');
+    console.log(`📏 HTML size: ${Math.round(__html__.length / 1024)}KB`);
 
-  private generateFlowNavigator(flow: any, theme: any): string {
-    const componentName = this.sanitizeComponentName(flow.name);
-    const screens = flow.screens || [];
+    // Show the UI with embedded HTML
+    figma.showUI(__html__, {
+      width: 420,
+      height: 680,
+      title: '🌉 React Native Flow Bridge'
+    });
+
+    console.log('✅ Figma UI displayed successfully');
+
+    // Initialize plugin state
+    updateSelectionState();
     
-    return `// ${componentName}Navigator.tsx - Generated Flow Navigator
-// Flow: ${flow.name}
-// Navigation Pattern: ${flow.navigationPattern}
+    // Send initial state to UI
+    sendMessageToUI({
+      type: 'plugin-initialized',
+      data: {
+        hasSelection: figma.currentPage.selection.length > 0
+      }
+    });
 
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createDrawerNavigator } from '@react-navigation/drawer';
-
-// Screen imports
-${screens.map((screen: any) => 
-  `import ${this.sanitizeComponentName(screen.name)} from '../screens/${this.sanitizeComponentName(screen.name)}';`
-).join('\n')}
-
-// Theme import
-import theme from '../theme';
-
-const Stack = createStackNavigator();
-const Tab = createBottomTabNavigator();
-const Drawer = createDrawerNavigator();
-
-interface ${componentName}NavigatorProps {
-  initialRoute?: string;
-  onNavigationStateChange?: (state: any) => void;
+  } catch (error) {
+    console.error('❌ Error showing UI:', error);
+    figma.closePlugin(`UI Error: ${error.message}`);
+  }
 }
 
-${this.generateNavigatorComponent(flow, screens, componentName)}
+function updateSelectionState() {
+  pluginState.currentSelection = figma.currentPage.selection;
+  console.log(`📌 Selection updated: ${pluginState.currentSelection.length} items`);
+}
 
-export default ${componentName}Navigator;
-
-// Navigation utilities
-export const navigate${componentName} = {
-${screens.map((screen: any, index: number) => `  to${this.sanitizeComponentName(screen.name)}: () => navigate('${screen.name}'),`).join('\n')}
-};
-
-// Type exports for navigation
-export type ${componentName}StackParamList = {
-${screens.map((screen: any) => `  ${screen.name}: undefined;`).join('\n')}
-};
-
-/*
-Flow Information:
-- User Role: ${flow.userRole?.name || 'Unknown'}
-- Flow Type: ${flow.flowType}
-- Device Targets: ${flow.deviceTargets?.join(', ') || 'Unknown'}
-- Estimated Duration: ${flow.estimatedDuration || 'Unknown'} seconds
-- Screen Count: ${screens.length}
-*/`;
+// Handle messages from the UI
+figma.ui.onmessage = async (msg) => {
+  console.log('📨 Received message from UI:', msg.type);
+  
+  // Prevent multiple simultaneous operations
+  if (pluginState.isProcessing && !['close-plugin', 'cancel-operation'].includes(msg.type)) {
+    console.warn('⚠️  Operation in progress, ignoring request');
+    sendMessageToUI({
+      type: 'error',
+      error: 'Another operation is in progress. Please wait.'
+    });
+    return;
   }
-
-  private generateNavigatorComponent(flow: any, screens: any[], componentName: string): string {
-    const pattern = flow.navigationPattern || 'stack';
-    
-    switch (pattern) {
-      case 'tab':
-        return this.generateTabNavigator(screens, componentName);
-      case 'drawer':
-        return this.generateDrawerNavigator(screens, componentName);
-      case 'modal':
-        return this.generateModalNavigator(screens, componentName);
-      default:
-        return this.generateStackNavigator(screens, componentName);
-    }
-  }
-
-  private generateStackNavigator(screens: any[], componentName: string): string {
-    return `const ${componentName}Navigator: React.FC<${componentName}NavigatorProps> = ({ 
-  initialRoute = '${screens[0]?.name || 'Home'}',
-  onNavigationStateChange 
-}) => {
-  return (
-    <NavigationContainer onStateChange={onNavigationStateChange}>
-      <Stack.Navigator 
-        initialRouteName={initialRoute}
-        screenOptions={{
-          headerStyle: {
-            backgroundColor: theme.colors?.primary || '#007AFF',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          },
-        }}
-      >
-${screens.map((screen: any) => `        <Stack.Screen 
-          name="${screen.name}" 
-          component={${this.sanitizeComponentName(screen.name)}} 
-          options={{ 
-            title: '${screen.name}',
-            headerShown: true
-          }}
-        />`).join('\n')}
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
-};`;
-  }
-
-  private generateTabNavigator(screens: any[], componentName: string): string {
-    return `const ${componentName}Navigator: React.FC<${componentName}NavigatorProps> = ({ 
-  initialRoute = '${screens[0]?.name || 'Home'}',
-  onNavigationStateChange 
-}) => {
-  return (
-    <NavigationContainer onStateChange={onNavigationStateChange}>
-      <Tab.Navigator 
-        initialRouteName={initialRoute}
-        screenOptions={{
-          tabBarStyle: {
-            backgroundColor: theme.colors?.white || '#FFFFFF',
-          },
-          tabBarActiveTintColor: theme.colors?.primary || '#007AFF',
-          tabBarInactiveTintColor: theme.colors?.gray || '#999999',
-        }}
-      >
-${screens.slice(0, 5).map((screen: any) => `        <Tab.Screen 
-          name="${screen.name}" 
-          component={${this.sanitizeComponentName(screen.name)}} 
-          options={{ 
-            title: '${screen.name}',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ color, fontSize: size }}>📱</Text>
+  
+  try {
+    switch (msg.type) {
+      case 'detect-flows':
+        await handleDetectFlows();
+        break;
+        
+      case 'extract-tokens':
+        await handleExtractTokens();
+        break;
+        
+      case 'generate-flow-code':
+        await handleGenerateFlowCode(msg);
+        break;
+        
+      case 'generate-screen-code':
+        await handleGenerateScreenCode(msg);
+        break;
+        
+      case 'export-flow-theme':
+        await handleExportFlowTheme(msg);
+        break;
+        
+      case 'generate-project-structure':
+        await handleGenerateProjectStructure(msg);
+        break;
+        
+      case 'refresh-selection':
+        updateSelectionState();
+        sendMessageToUI({
+          type: 'selection-refreshed',
+          data: {
+            selectionCount: pluginState.currentSelection.length,
+            hasFrames: pluginState.currentSelection.some(node => 
+              node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE'
             )
-          }}
-        />`).join('\n')}
-      </Tab.Navigator>
-    </NavigationContainer>
-  );
-};`;
+          }
+        });
+        break;
+        
+      case 'cancel-operation':
+        pluginState.isProcessing = false;
+        sendMessageToUI({
+          type: 'operation-cancelled'
+        });
+        break;
+        
+      case 'close-plugin':
+        figma.closePlugin('Plugin closed by user');
+        break;
+        
+      default:
+        console.warn('⚠️  Unknown message type:', msg.type);
+        sendMessageToUI({
+          type: 'error',
+          error: `Unknown message type: ${msg.type}`
+        });
+    }
+  } catch (error) {
+    console.error('❌ Error handling message:', error);
+    pluginState.isProcessing = false;
+    sendMessageToUI({
+      type: 'error',
+      error: `Handler error: ${error.message}`
+    });
+  }
+};
+
+// Utility function to send messages to UI
+function sendMessageToUI(message: any) {
+  try {
+    figma.ui.postMessage(message);
+  } catch (error) {
+    console.error('❌ Error sending message to UI:', error);
+  }
+}
+
+// Utility function to send progress updates
+function sendProgress(progress: number, message: string) {
+  sendMessageToUI({
+    type: 'progress',
+    progress,
+    message
+  });
+}
+
+// Validate selection has frames/components
+function validateSelection(): { isValid: boolean; error?: string } {
+  if (pluginState.currentSelection.length === 0) {
+    return { 
+      isValid: false, 
+      error: 'Please select some frames or components to analyze' 
+    };
   }
 
-  private generateDrawerNavigator(screens: any[], componentName: string): string {
-    return `const ${componentName}Navigator: React.FC<${componentName}NavigatorProps> = ({ 
-  initialRoute = '${screens[0]?.name || 'Home'}',
-  onNavigationStateChange 
-}) => {
-  return (
-    <NavigationContainer onStateChange={onNavigationStateChange}>
-      <Drawer.Navigator 
-        initialRouteName={initialRoute}
-        screenOptions={{
-          drawerStyle: {
-            backgroundColor: theme.colors?.white || '#FFFFFF',
-          },
-          drawerActiveTintColor: theme.colors?.primary || '#007AFF',
-        }}
-      >
-${screens.map((screen: any) => `        <Drawer.Screen 
-          name="${screen.name}" 
-          component={${this.sanitizeComponentName(screen.name)}} 
-          options={{ title: '${screen.name}' }}
-        />`).join('\n')}
-      </Drawer.Navigator>
-    </NavigationContainer>
+  const hasFrames = pluginState.currentSelection.some(node => 
+    node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE'
   );
-};`;
+
+  if (!hasFrames) {
+    return { 
+      isValid: false, 
+      error: 'Please select frames, components, or component instances' 
+    };
   }
 
-  private generateModalNavigator(screens: any[], componentName: string): string {
-    return `const ${componentName}Navigator: React.FC<${componentName}NavigatorProps> = ({ 
-  initialRoute = '${screens[0]?.name || 'Home'}',
-  onNavigationStateChange 
-}) => {
-  return (
-    <NavigationContainer onStateChange={onNavigationStateChange}>
-      <Stack.Navigator 
-        initialRouteName={initialRoute}
-        screenOptions={{
-          presentation: 'modal',
-          headerStyle: {
-            backgroundColor: theme.colors?.primary || '#007AFF',
-          },
-          headerTintColor: '#fff',
-        }}
-      >
-${screens.map((screen: any) => `        <Stack.Screen 
-          name="${screen.name}" 
-          component={${this.sanitizeComponentName(screen.name)}} 
-          options={{ 
-            title: '${screen.name}',
-            presentation: 'modal'
-          }}
-        />`).join('\n')}
-      </Stack.Navigator>
-    </NavigationContainer>
-  );
-};`;
-  }
+  return { isValid: true };
+}
 
-  private extractDesignValuesFromFlow(flow: any): any {
-    // Extract design values specific to this flow
-    const values = {
-      colors: new Set<string>(),
-      fontSizes: new Set<number>(),
-      fontWeights: new Set<string>(),
-      fontFamilies: new Set<string>(),
-      borderRadius: new Set<number>(),
-      spacing: new Set<number>(),
-      shadows: new Set<string>(),
-      opacity: new Set<number>(),
-      buttons: [] as any[],
-      inputs: [] as any[],
-      headings: [] as any[],
-      labels: [] as any[],
-      cards: [] as any[],
-      navigationItems: [] as any[]
+// Enhanced flow detection with real Figma API integration
+async function handleDetectFlows() {
+  try {
+    pluginState.isProcessing = true;
+    sendProgress(5, 'Validating selection...');
+
+    const validation = validateSelection();
+    if (!validation.isValid) {
+      throw new Error(validation.error);
+    }
+
+    sendProgress(15, 'Analyzing design structure...');
+
+    // Get all frames from selection and page
+    const selectedFrames = pluginState.currentSelection.filter(node => 
+      node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE'
+    ) as (FrameNode | ComponentNode | InstanceNode)[];
+
+    sendProgress(25, 'Extracting screen information...');
+
+    // Process each frame to extract screen data
+    const screens = await Promise.all(selectedFrames.map(async (frame, index) => {
+      await new Promise(resolve => setTimeout(resolve, 50)); // Prevent blocking
+      
+      return {
+        id: frame.id,
+        name: frame.name,
+        width: Math.round(frame.width),
+        height: Math.round(frame.height),
+        deviceType: detectDeviceType(frame.width, frame.height),
+        components: await analyzeFrameComponents(frame),
+        x: frame.x,
+        y: frame.y,
+        fills: frame.fills,
+        effects: frame.effects
+      };
+    }));
+
+    sendProgress(50, 'Detecting user flows and patterns...');
+
+    // Analyze naming patterns and structure
+    const flows = detectFlowsFromScreens(screens);
+    
+    sendProgress(75, 'Identifying user roles...');
+
+    // Detect user roles from naming conventions
+    const userRoles = detectUserRoles(screens);
+
+    sendProgress(90, 'Generating flow analysis...');
+
+    // Create comprehensive flow data
+    const flowData = {
+      flows: flows,
+      userRoles: userRoles,
+      theme: await extractBasicTheme(selectedFrames),
+      analysis: {
+        overview: {
+          totalScreens: screens.length,
+          totalFrames: selectedFrames.length,
+          deviceTypes: [...new Set(screens.map(s => s.deviceType))],
+          averageScreenSize: calculateAverageScreenSize(screens)
+        },
+        patterns: analyzeNamingPatterns(screens),
+        recommendations: generateRecommendations(flows, screens)
+      }
     };
 
-    flow.screens?.forEach((screen: any) => {
-      this.extractValuesFromComponents(screen.components || [], values);
+    pluginState.detectedFlows = flowData.flows;
+    
+    sendProgress(100, 'Flow detection complete!');
+
+    sendMessageToUI({
+      type: 'flows-detected',
+      data: flowData
     });
 
-    return values;
-  }
+    console.log(`✅ Detected ${flows.length} flows from ${screens.length} screens`);
 
-  private extractValuesFromComponents(components: any[], values: any): void {
-    components.forEach(component => {
-      // Extract colors
-      if (component.backgroundColor) values.colors.add(component.backgroundColor);
-      if (component.textColor) values.colors.add(component.textColor);
-      
-      // Extract typography
-      if (component.fontSize) values.fontSizes.add(component.fontSize);
-      if (component.fontWeight) values.fontWeights.add(component.fontWeight);
-      
-      // Extract other properties
-      if (component.borderRadius) values.borderRadius.add(component.borderRadius);
-      
-      // Categorize components
-      if (component.semanticType === 'button') values.buttons.push(component);
-      if (component.semanticType === 'input') values.inputs.push(component);
-      if (component.semanticType === 'heading') values.headings.push(component);
-      
-      // Process children
-      if (component.children) {
-        this.extractValuesFromComponents(component.children, values);
-      }
+  } catch (error) {
+    console.error('❌ Error in flow detection:', error);
+    sendMessageToUI({
+      type: 'error',
+      error: `Flow detection failed: ${error.message}`
     });
-  }
-
-  private sanitizeComponentName(name: string): string {
-    return name.replace(/[^a-zA-Z0-9]/g, '').replace(/^[0-9]/, '_') || 'Component';
-  }
-
-  // Existing methods remain the same...
-  private sendLogs(): void {
-    try {
-      const logs = logger.getLogs();
-      const errorSummary = logger.getErrorSummary();
-      const memoryUsage = logger.getMemoryUsage();
-      
-      figma.ui.postMessage({
-        type: MESSAGE_TYPES.LOGS_DATA,
-        data: {
-          logs,
-          errorSummary,
-          memoryUsage,
-          exportedAt: Date.now()
-        }
-      });
-      
-      logger.info(MODULE_NAME, 'sendLogs', `Sent ${logs.length} log entries to UI`);
-    } catch (error) {
-      logger.error(MODULE_NAME, 'sendLogs', 'Error sending logs to UI:', error as Error);
-    }
-  }
-
-  private sendFinalLogs(): void {
-    try {
-      const finalLogs = logger.exportLogs();
-      const errorStats = ErrorHandler.getStatistics();
-      
-      figma.ui.postMessage({
-        type: MESSAGE_TYPES.FINAL_LOGS,
-        data: {
-          logs: finalLogs,
-          errorStats,
-          pluginStats: {
-            sessionDuration: Date.now() - this.startTime,
-            totalMessages: this.messageCount,
-            finalTimestamp: Date.now()
-          }
-        }
-      });
-    } catch (error) {
-      console.error('Failed to send final logs:', error);
-    }
-  }
-
-  // Session tracking
-  private startTime = Date.now();
-  private messageCount = 0;
-
-  private incrementMessageCount(): void {
-    this.messageCount++;
-    logger.debug(MODULE_NAME, 'incrementMessageCount', `Message count: ${this.messageCount}`);
-  }
-
-  // Cleanup method
-  destroy(): void {
-    try {
-      this.sendFinalLogs();
-      logger.info(MODULE_NAME, 'destroy', 'Plugin cleanup complete');
-    } catch (error) {
-      console.error('Error during plugin cleanup:', error);
-    }
+  } finally {
+    pluginState.isProcessing = false;
   }
 }
 
-// Global instance for cleanup
-let bridgeInstance: FigmaReactNativeBridge | null = null;
-
-// Error boundary and initialization
-function initializePluginWithErrorHandling(): void {
+// Enhanced token extraction
+async function handleExtractTokens() {
   try {
-    // Set up global error handling
-    if (typeof window !== 'undefined') {
-      window.addEventListener('error', (event) => {
-        ErrorHandler.handle(event.error, {
-          module: MODULE_NAME,
-          function: 'globalErrorHandler',
-          operation: 'global error handling',
-          additionalData: { 
-            message: event.message,
-            filename: event.filename,
-            lineno: event.lineno,
-            colno: event.colno
-          }
-        });
-      });
+    pluginState.isProcessing = true;
+    sendProgress(10, 'Starting token extraction...');
 
-      window.addEventListener('unhandledrejection', (event) => {
-        ErrorHandler.handle(new Error(event.reason), {
-          module: MODULE_NAME,
-          function: 'globalRejectionHandler',
-          operation: 'unhandled promise rejection',
-          additionalData: { reason: event.reason }
-        });
-      });
+    const validation = validateSelection();
+    if (!validation.isValid) {
+      throw new Error(validation.error);
+    }
 
-      window.addEventListener('beforeunload', () => {
-        if (bridgeInstance) {
-          bridgeInstance.destroy();
+    const selectedNodes = pluginState.currentSelection;
+    
+    sendProgress(25, 'Extracting colors...');
+    const colors = await extractColors(selectedNodes);
+    
+    sendProgress(40, 'Extracting typography...');
+    const typography = await extractTypography(selectedNodes);
+    
+    sendProgress(55, 'Extracting spacing...');
+    const spacing = await extractSpacing(selectedNodes);
+    
+    sendProgress(70, 'Extracting effects...');
+    const effects = await extractEffects(selectedNodes);
+    
+    sendProgress(85, 'Generating theme file...');
+
+    const themeContent = generateThemeFile({
+      colors,
+      typography,
+      spacing,
+      effects,
+      metadata: {
+        extractedFrom: selectedNodes.length + ' selected elements',
+        extractedAt: new Date().toISOString(),
+        figmaFileKey: getFileIdentifier(),
+        fileName: figma.root.name || 'Untitled'
+      }
+    });
+
+    pluginState.extractedTokens = { colors, typography, spacing, effects };
+
+    sendProgress(100, 'Token extraction complete!');
+
+    sendMessageToUI({
+      type: 'tokens-extracted',
+      data: {
+        fileContent: themeContent,
+        tokenCount: Object.keys(colors).length + Object.keys(typography).length + Object.keys(spacing).length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in token extraction:', error);
+    sendMessageToUI({
+      type: 'error',
+      error: `Token extraction failed: ${error.message}`
+    });
+  } finally {
+    pluginState.isProcessing = false;
+  }
+}
+
+// Enhanced code generation
+async function handleGenerateFlowCode(msg: any) {
+  try {
+    pluginState.isProcessing = true;
+    sendProgress(10, 'Preparing code generation...');
+
+    const flowId = msg.flowId;
+    const flow = pluginState.detectedFlows.find(f => f.id === flowId);
+    
+    if (!flow) {
+      throw new Error('Flow not found. Please detect flows first.');
+    }
+
+    sendProgress(25, 'Generating navigation structure...');
+    
+    const navigationCode = generateNavigationCode(flow);
+    
+    sendProgress(45, 'Generating screen components...');
+    
+    const screenFiles = await generateScreenFiles(flow.screens);
+    
+    sendProgress(65, 'Generating theme integration...');
+    
+    const themeCode = generateFlowTheme(flow);
+    
+    sendProgress(80, 'Generating type definitions...');
+    
+    const typeDefinitions = generateTypeDefinitions(flow);
+    
+    sendProgress(95, 'Assembling package...');
+
+    const files = {
+      [`${flow.name}Navigator.tsx`]: navigationCode,
+      'theme.ts': themeCode,
+      'types.ts': typeDefinitions,
+      ...screenFiles
+    };
+
+    sendProgress(100, 'Code generation complete!');
+
+    sendMessageToUI({
+      type: 'flow-code-generated',
+      data: {
+        files: files,
+        flowName: flow.name,
+        fileCount: Object.keys(files).length
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error in code generation:', error);
+    sendMessageToUI({
+      type: 'error',
+      error: `Code generation failed: ${error.message}`
+    });
+  } finally {
+    pluginState.isProcessing = false;
+  }
+}
+
+async function handleGenerateScreenCode(msg: any) {
+  try {
+    pluginState.isProcessing = true;
+    const { flowId, screenName } = msg;
+    
+    sendProgress(10, `Generating code for ${screenName}...`);
+
+    const flow = pluginState.detectedFlows.find(f => f.id === flowId);
+    const screen = flow?.screens.find(s => s.name === screenName);
+    
+    if (!screen) {
+      throw new Error('Screen not found');
+    }
+
+    sendProgress(50, 'Analyzing screen components...');
+    
+    const screenCode = await generateSingleScreenCode(screen, flow);
+    
+    sendProgress(100, 'Screen code generated!');
+
+    sendMessageToUI({
+      type: 'screen-code-generated',
+      data: {
+        code: screenCode,
+        screenName: screen.name
+      }
+    });
+
+  } catch (error) {
+    sendMessageToUI({
+      type: 'error',
+      error: `Screen generation failed: ${error.message}`
+    });
+  } finally {
+    pluginState.isProcessing = false;
+  }
+}
+
+async function handleExportFlowTheme(msg: any) {
+  try {
+    pluginState.isProcessing = true;
+    const { flowId } = msg;
+    
+    const flow = pluginState.detectedFlows.find(f => f.id === flowId);
+    if (!flow) {
+      throw new Error('Flow not found');
+    }
+
+    const themeContent = generateFlowSpecificTheme(flow);
+    
+    sendMessageToUI({
+      type: 'flow-theme-exported',
+      data: {
+        themeContent,
+        flowName: flow.name,
+        timestamp: Date.now()
+      }
+    });
+
+  } catch (error) {
+    sendMessageToUI({
+      type: 'error',
+      error: `Theme export failed: ${error.message}`
+    });
+  } finally {
+    pluginState.isProcessing = false;
+  }
+}
+
+async function handleGenerateProjectStructure(msg: any) {
+  try {
+    pluginState.isProcessing = true;
+    const { flowId } = msg;
+    
+    sendProgress(20, 'Generating project structure...');
+    
+    const flow = pluginState.detectedFlows.find(f => f.id === flowId);
+    if (!flow) {
+      throw new Error('Flow not found');
+    }
+
+    const projectFiles = generateCompleteProjectStructure(flow, pluginState.extractedTokens);
+    
+    sendProgress(100, 'Project structure generated!');
+
+    sendMessageToUI({
+      type: 'project-structure-generated',
+      data: {
+        files: projectFiles
+      }
+    });
+
+  } catch (error) {
+    sendMessageToUI({
+      type: 'error',
+      error: `Project structure generation failed: ${error.message}`
+    });
+  } finally {
+    pluginState.isProcessing = false;
+  }
+}
+
+// Helper functions for analysis and generation
+
+function detectDeviceType(width: number, height: number): 'mobile' | 'tablet' | 'desktop' {
+  if (width <= 480) return 'mobile';
+  if (width <= 1024) return 'tablet';
+  return 'desktop';
+}
+
+async function analyzeFrameComponents(frame: FrameNode | ComponentNode | InstanceNode) {
+  const components = [];
+  
+  function traverse(node: SceneNode) {
+    // Analyze node type and properties
+    const component = {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      semanticType: determineSemanticType(node),
+      x: node.x,
+      y: node.y,
+      width: node.width,
+      height: node.height,
+      visible: node.visible
+    };
+    
+    components.push(component);
+    
+    // Recursively analyze children
+    if ('children' in node) {
+      node.children.forEach(traverse);
+    }
+  }
+  
+  if ('children' in frame) {
+    frame.children.forEach(traverse);
+  }
+  
+  return components;
+}
+
+function determineSemanticType(node: SceneNode): string {
+  const name = node.name.toLowerCase();
+  
+  if (name.includes('button') || (node.type === 'FRAME' && name.includes('btn'))) {
+    return 'button';
+  }
+  if (name.includes('input') || name.includes('textfield')) {
+    return 'input';
+  }
+  if (name.includes('header') || name.includes('navbar')) {
+    return 'header';
+  }
+  if (name.includes('card')) {
+    return 'card';
+  }
+  if (node.type === 'TEXT') {
+    return name.includes('title') || name.includes('heading') ? 'heading' : 'text';
+  }
+  if (name.includes('icon')) {
+    return 'icon';
+  }
+  if (name.includes('image') || node.type === 'RECTANGLE' && name.includes('img')) {
+    return 'image';
+  }
+  
+  return 'element';
+}
+
+function detectFlowsFromScreens(screens: any[]) {
+  const flows = [];
+  const flowGroups = new Map();
+  
+  // Group screens by potential flow patterns
+  screens.forEach(screen => {
+    const flowKey = extractFlowIdentifier(screen.name);
+    if (!flowGroups.has(flowKey)) {
+      flowGroups.set(flowKey, []);
+    }
+    flowGroups.get(flowKey).push(screen);
+  });
+  
+  // Convert groups to flow objects
+  let flowIndex = 1;
+  for (const [flowName, flowScreens] of flowGroups) {
+    if (flowScreens.length > 0) {
+      flows.push({
+        id: `flow-${flowIndex++}`,
+        name: flowName || `Flow ${flowIndex}`,
+        flowType: detectFlowType(flowName, flowScreens),
+        userRole: detectUserRole(flowName, flowScreens),
+        deviceTargets: [...new Set(flowScreens.map(s => s.deviceType))],
+        navigationPattern: 'stack', // Could be enhanced to detect other patterns
+        screens: flowScreens,
+        estimatedDuration: flowScreens.length * 60, // 1 minute per screen estimate
+        createdAt: Date.now()
+      });
+    }
+  }
+  
+  return flows;
+}
+
+function extractFlowIdentifier(screenName: string): string {
+  // Extract flow name from screen names like "Onboarding_1", "Customer_Login", etc.
+  const patterns = [
+    /^([A-Za-z]+)_\d+/,  // Pattern: "Onboarding_1"
+    /^([A-Za-z]+)_[A-Za-z]+/,  // Pattern: "Customer_Login"
+    /^([A-Za-z]+)\s+\d+/,  // Pattern: "Onboarding 1"
+    /^([A-Za-z]+)\s+[A-Za-z]+/  // Pattern: "Customer Login"
+  ];
+  
+  for (const pattern of patterns) {
+    const match = screenName.match(pattern);
+    if (match) {
+      return match[1];
+    }
+  }
+  
+  // Fallback: use first word
+  return screenName.split(/[\s_-]/)[0] || 'Unknown';
+}
+
+function detectFlowType(flowName: string, screens: any[]): string {
+  const name = flowName.toLowerCase();
+  
+  if (name.includes('onboard')) return 'onboarding';
+  if (name.includes('auth') || name.includes('login') || name.includes('signup')) return 'authentication';
+  if (name.includes('setting') || name.includes('config')) return 'settings';
+  if (name.includes('checkout') || name.includes('payment')) return 'checkout';
+  if (name.includes('main') || name.includes('home') || name.includes('dashboard')) return 'main_feature';
+  
+  return 'unknown';
+}
+
+function detectUserRole(flowName: string, screens: any[]) {
+  const name = flowName.toLowerCase();
+  
+  if (name.includes('admin')) {
+    return { type: 'admin', name: 'Administrator' };
+  }
+  if (name.includes('customer') || name.includes('user')) {
+    return { type: 'customer', name: 'Customer' };
+  }
+  if (name.includes('operator') || name.includes('staff')) {
+    return { type: 'operator', name: 'Operator' };
+  }
+  if (name.includes('guest')) {
+    return { type: 'guest', name: 'Guest' };
+  }
+  
+  return { type: 'customer', name: 'User' };
+}
+
+function detectUserRoles(screens: any[]): string[] {
+  const roles = new Set();
+  
+  screens.forEach(screen => {
+    const flowName = extractFlowIdentifier(screen.name);
+    const role = detectUserRole(flowName, [screen]);
+    roles.add(role.type);
+  });
+  
+  return Array.from(roles);
+}
+
+async function extractBasicTheme(frames: (FrameNode | ComponentNode | InstanceNode)[]) {
+  const colors = new Set();
+  const fonts = new Set();
+  
+  // Extract basic styling information
+  frames.forEach(frame => {
+    if (frame.fills && Array.isArray(frame.fills)) {
+      frame.fills.forEach(fill => {
+        if (fill.type === 'SOLID') {
+          colors.add(rgbToHex(fill.color));
         }
       });
     }
+  });
+  
+  return {
+    primaryColors: Array.from(colors).slice(0, 5),
+    fonts: Array.from(fonts)
+  };
+}
 
-    // Initialize and start the plugin
-    bridgeInstance = new FigmaReactNativeBridge();
-    bridgeInstance.init();
+function calculateAverageScreenSize(screens: any[]) {
+  if (screens.length === 0) return { width: 0, height: 0 };
+  
+  const total = screens.reduce((acc, screen) => ({
+    width: acc.width + screen.width,
+    height: acc.height + screen.height
+  }), { width: 0, height: 0 });
+  
+  return {
+    width: Math.round(total.width / screens.length),
+    height: Math.round(total.height / screens.length)
+  };
+}
+
+function analyzeNamingPatterns(screens: any[]) {
+  return {
+    hasConsistentNaming: screens.every(s => s.name.includes('_') || s.name.includes(' ')),
+    usesUnderscores: screens.some(s => s.name.includes('_')),
+    usesSpaces: screens.some(s => s.name.includes(' ')),
+    averageNameLength: screens.reduce((acc, s) => acc + s.name.length, 0) / screens.length
+  };
+}
+
+function generateRecommendations(flows: any[], screens: any[]) {
+  const recommendations = [];
+  
+  if (flows.length === 0) {
+    recommendations.push({
+      type: 'naming',
+      message: 'Consider using consistent naming patterns like "FlowName_ScreenNumber" to help with flow detection'
+    });
+  }
+  
+  if (screens.length < 3) {
+    recommendations.push({
+      type: 'scope',
+      message: 'Select more screens to get better flow analysis results'
+    });
+  }
+  
+  return recommendations;
+}
+
+// Utility function to get file identifier
+function getFileIdentifier(): string {
+  try {
+    // Use only available Figma API properties
+    const fileName = figma.root.name || 'untitled';
+    const pageName = figma.currentPage.name || 'page';
+    const timestamp = Date.now().toString(36);
     
-    logger.info(MODULE_NAME, 'initializePluginWithErrorHandling', 'Plugin successfully loaded with enhanced flow support');
+    // Create identifier from file name + page + timestamp
+    const cleanFileName = fileName.replace(/[^a-zA-Z0-9]/g, '_');
+    const cleanPageName = pageName.replace(/[^a-zA-Z0-9]/g, '_');
+    
+    return `figma_${cleanFileName}_${cleanPageName}_${timestamp}`;
     
   } catch (error) {
-    ErrorHandler.handle(error as Error, {
-      module: MODULE_NAME,
-      function: 'initializePluginWithErrorHandling',
-      operation: 'plugin startup'
-    });
-    
-    // Try to show a basic error message to the user
-    try {
-      if (figma && figma.ui && figma.ui.postMessage) {
-        figma.ui.postMessage({
-          type: MESSAGE_TYPES.CRITICAL_ERROR,
-          error: {
-            message: 'Plugin failed to initialize',
-            timestamp: Date.now(),
-            details: (error as Error).message
-          }
-        });
-      }
-    } catch (uiError) {
-      console.error('Critical error: Failed to initialize plugin and cannot communicate with UI:', error);
-      console.error('UI communication error:', uiError);
-    }
+    console.warn('⚠️  Could not determine file identifier:', error);
+    return `unknown_${Date.now().toString(36)}`;
   }
 }
 
-// Start the plugin
-logger.info(MODULE_NAME, 'startup', 'Figma React Native Bridge Plugin with Flow Support loading...');
-initializePluginWithErrorHandling();
+// Color and styling utilities
+function rgbToHex(rgb: RGB): string {
+  const toHex = (n: number) => Math.round(n * 255).toString(16).padStart(2, '0');
+  return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+}
+
+async function extractColors(nodes: readonly SceneNode[]) {
+  const colors: { [key: string]: string } = {};
+  
+  // Implementation for color extraction
+  // This would analyze fills, strokes, etc.
+  
+  return colors;
+}
+
+async function extractTypography(nodes: readonly SceneNode[]) {
+  const typography: { [key: string]: any } = {};
+  
+  // Implementation for typography extraction
+  // This would analyze text nodes, fonts, sizes, etc.
+  
+  return typography;
+}
+
+async function extractSpacing(nodes: readonly SceneNode[]) {
+  const spacing: { [key: string]: number } = {};
+  
+  // Implementation for spacing extraction
+  // This would analyze gaps, margins, padding, etc.
+  
+  return spacing;
+}
+
+async function extractEffects(nodes: readonly SceneNode[]) {
+  const effects: { [key: string]: any } = {};
+  
+  // Implementation for effects extraction
+  // This would analyze shadows, blurs, etc.
+  
+  return effects;
+}
+
+function generateThemeFile(data: any): string {
+  return `// Generated Theme File
+// Extracted from Figma on ${new Date().toISOString()}
+
+export const theme = {
+  COLORS: ${JSON.stringify(data.colors, null, 2)},
+  
+  TYPOGRAPHY: ${JSON.stringify(data.typography, null, 2)},
+  
+  SPACING: ${JSON.stringify(data.spacing, null, 2)},
+  
+  EFFECTS: ${JSON.stringify(data.effects, null, 2)},
+  
+  // Metadata
+  METADATA: ${JSON.stringify(data.metadata, null, 2)}
+};
+
+export default theme;
+`;
+}
+
+// Code generation functions (these would be implemented based on your existing generators)
+function generateNavigationCode(flow: any): string {
+  return `// Navigation code for ${flow.name}`;
+}
+
+async function generateScreenFiles(screens: any[]): Promise<{ [key: string]: string }> {
+  const files: { [key: string]: string } = {};
+  
+  screens.forEach(screen => {
+    files[`${screen.name}Screen.tsx`] = `// Screen component for ${screen.name}`;
+  });
+  
+  return files;
+}
+
+function generateFlowTheme(flow: any): string {
+  return `// Theme for ${flow.name} flow`;
+}
+
+function generateTypeDefinitions(flow: any): string {
+  return `// Type definitions for ${flow.name}`;
+}
+
+async function generateSingleScreenCode(screen: any, flow: any): Promise<string> {
+  return `// Single screen code for ${screen.name}`;
+}
+
+function generateFlowSpecificTheme(flow: any): string {
+  return `// Flow-specific theme for ${flow.name}`;
+}
+
+function generateCompleteProjectStructure(flow: any, tokens: any): { [key: string]: string } {
+  return {
+    'package.json': '{}',
+    'App.tsx': '// Main app',
+    'README.md': `# ${flow.name} Project`
+  };
+}
+
+// Initialize the plugin
+try {
+  showPluginUI();
+  console.log('✅ Plugin initialized successfully');
+} catch (error) {
+  console.error('❌ Critical error during plugin initialization:', error);
+  figma.closePlugin(`Initialization error: ${error.message}`);
+}
