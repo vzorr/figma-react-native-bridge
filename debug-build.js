@@ -1,15 +1,15 @@
-// debug-build.js - Run this to check your generated code
+// debug-build.js - Enhanced version to debug minified code
 const fs = require('fs');
 const path = require('path');
 
 function debugBuild() {
-  console.log('🔍 Debugging Figma Plugin Build\n');
+  console.log('🔍 Enhanced Figma Plugin Build Debug\n');
   
   // Check if dist folder exists
   const distPath = path.join(__dirname, 'dist');
   if (!fs.existsSync(distPath)) {
     console.log('❌ No dist folder found. Run npm run build first.');
-    return;
+    return false;
   }
   
   // Check files in dist
@@ -25,75 +25,91 @@ function debugBuild() {
     console.log(`   Size: ${(codeContent.length / 1024).toFixed(2)}KB`);
     console.log(`   Lines: ${codeContent.split('\n').length}`);
     
-    // Check first 10 lines for syntax issues
-    const lines = codeContent.split('\n');
-    console.log('\n🔍 First 10 lines of code.js:');
-    lines.slice(0, 10).forEach((line, index) => {
-      console.log(`${String(index + 1).padStart(3, ' ')}: ${line.substring(0, 80)}${line.length > 80 ? '...' : ''}`);
+    // Look for HTML injection in minified code
+    console.log('\n🔍 Searching for HTML injection patterns...');
+    
+    // Check for various __html__ patterns
+    const htmlPatterns = [
+      /__html__/g,
+      /window\.__html__/g,
+      /global\.__html__/g,
+      /self\.__html__/g,
+      /"__html__"/g,
+      /'__html__'/g
+    ];
+    
+    let htmlFound = false;
+    htmlPatterns.forEach((pattern, index) => {
+      const matches = codeContent.match(pattern);
+      if (matches) {
+        console.log(`✅ Pattern ${index + 1} found: ${pattern.source} (${matches.length} occurrences)`);
+        htmlFound = true;
+      }
     });
     
-    // Check for HTML injection
-    if (codeContent.includes('var __html__')) {
-      console.log('\n✅ __html__ variable found in code.js');
-      
-      // Find the HTML declaration line
-      const htmlLineIndex = lines.findIndex(line => line.includes('var __html__'));
-      if (htmlLineIndex >= 0) {
-        console.log(`   HTML declaration on line ${htmlLineIndex + 1}`);
-        console.log(`   Content preview: ${lines[htmlLineIndex].substring(0, 100)}...`);
-      }
-
-      // Try to extract and validate the HTML content
-      try {
-        // More robust regex to find the complete HTML string
-        const htmlMatch = codeContent.match(/var __html__ = ("[^"]*(?:\\.[^"]*)*");/);
-        if (htmlMatch) {
-          const htmlContent = JSON.parse(htmlMatch[1]);
-          console.log(`✅ HTML content successfully extracted (${(htmlContent.length / 1024).toFixed(2)}KB)`);
-          
-          // Basic HTML validation
-          if (htmlContent.includes('<!DOCTYPE html>')) {
-            console.log('✅ Valid HTML structure detected');
-          } else {
-            console.log('⚠️  No DOCTYPE found in HTML');
-          }
-          
-          if (htmlContent.includes('</html>')) {
-            console.log('✅ Complete HTML document');
-          } else {
-            console.log('⚠️  HTML document appears incomplete');
-          }
-        } else {
-          console.log('⚠️  Could not extract HTML content - string may be too complex');
-          console.log('✅ But __html__ variable exists, so injection worked');
-        }
-      } catch (parseError) {
-        console.log('⚠️  Could not parse HTML content (likely due to size/complexity)');
-        console.log('✅ But __html__ variable exists, so injection worked');
-      }
-    } else {
-      console.log('\n❌ __html__ variable NOT found in code.js');
+    if (!htmlFound) {
+      console.log('❌ No __html__ patterns found in code');
     }
     
-    // Better syntax check - skip the complex HTML validation
-    try {
-      // Simple check: look for critical patterns
-      const hasValidStart = codeContent.includes('var __html__');
-      const hasValidEnd = codeContent.includes('})();');
-      const hasExports = codeContent.includes('module.exports');
+    // Look for HTML content injection
+    if (codeContent.includes('<!DOCTYPE html>') || codeContent.includes('<html>')) {
+      console.log('✅ HTML content detected in code.js');
       
-      if (hasValidStart && hasValidEnd) {
-        console.log('✅ Code structure appears valid');
-        console.log('✅ HTML injection successful');
-        console.log('✅ Webpack compilation successful'); 
-      } else {
-        console.log('⚠️  Code structure may have issues');
+      // Try to find the approximate location
+      const htmlStart = codeContent.indexOf('<!DOCTYPE html>') !== -1 ? 
+        codeContent.indexOf('<!DOCTYPE html>') : codeContent.indexOf('<html>');
+      if (htmlStart >= 0) {
+        const context = codeContent.substring(Math.max(0, htmlStart - 50), htmlStart + 100);
+        console.log(`   HTML context: ...${context.substring(0, 150)}...`);
       }
-      
-    } catch (syntaxError) {
-      console.log('❌ JavaScript syntax error detected:');
-      console.log(`   ${syntaxError.message}`);
-      return false;
+    } else {
+      console.log('❌ No HTML content found in code.js');
+    }
+    
+    // Look for the HTML injection function
+    if (codeContent.includes('htmlContent') || codeContent.includes('HTML Content Injection')) {
+      console.log('✅ HTML injection code detected');
+    } else {
+      console.log('❌ No HTML injection code detected');
+    }
+    
+    // Check for module exports pattern
+    if (codeContent.includes('module.exports.__html__')) {
+      console.log('✅ Module export pattern found');
+    }
+    
+    // More sophisticated analysis for minified code
+    console.log('\n🔍 Advanced analysis of minified code:');
+    
+    // Look for JSON-encoded HTML (will be a long string)
+    const longStringPattern = /"[^"\\]*(?:\\.[^"\\]*)*"/g;
+    const longStrings = codeContent.match(longStringPattern);
+    if (longStrings) {
+      const htmlStrings = longStrings.filter(str => str.length > 1000);
+      if (htmlStrings.length > 0) {
+        console.log(`✅ Found ${htmlStrings.length} long encoded string(s) (likely HTML content)`);
+        htmlStrings.forEach((str, index) => {
+          if (str.includes('<!DOCTYPE') || str.includes('<html>') || str.includes('</html>')) {
+            console.log(`   String ${index + 1}: Contains HTML content (${(str.length / 1024).toFixed(2)}KB)`);
+          }
+        });
+      } else {
+        console.log('❌ No long encoded strings found (HTML may not be injected)');
+      }
+    } else {
+      console.log('❌ No encoded strings found');
+    }
+    
+    // Check if the code structure is valid
+    try {
+      // Don't actually eval, just check basic structure
+      if (codeContent.includes('(()=>{') || codeContent.includes('(function()')) {
+        console.log('✅ Valid webpack bundle structure detected');
+      } else {
+        console.log('⚠️  Unexpected code structure');
+      }
+    } catch (e) {
+      console.log('❌ Code structure validation failed');
     }
     
   } else {
@@ -106,7 +122,30 @@ function debugBuild() {
   if (fs.existsSync(uiHtmlPath)) {
     const uiContent = fs.readFileSync(uiHtmlPath, 'utf8');
     console.log(`\n📄 ui.html: ${(uiContent.length / 1024).toFixed(2)}KB`);
-    console.log('✅ ui.html copied successfully');
+    
+    // Verify HTML structure
+    if (uiContent.includes('<!DOCTYPE html>') && uiContent.includes('</html>')) {
+      console.log('✅ Valid HTML document structure');
+    } else {
+      console.log('⚠️  HTML document may be incomplete');
+    }
+    
+    // Check for key UI components
+    const uiChecks = [
+      { pattern: 'extractTokens', name: 'Extract Tokens function' },
+      { pattern: 'extractScreens', name: 'Extract Screens function' },
+      { pattern: 'onmessage', name: 'Message handler' },
+      { pattern: 'postMessage', name: 'Plugin communication' }
+    ];
+    
+    uiChecks.forEach(check => {
+      if (uiContent.includes(check.pattern)) {
+        console.log(`✅ ${check.name} found`);
+      } else {
+        console.log(`❌ ${check.name} missing`);
+      }
+    });
+    
   } else {
     console.log('\n❌ ui.html not found in dist folder');
   }
@@ -115,7 +154,7 @@ function debugBuild() {
   const manifestPath = path.join(__dirname, 'manifest.json');
   if (fs.existsSync(manifestPath)) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-    console.log('\n📄 manifest.json:');
+    console.log('\n📄 manifest.json validation:');
     console.log(`   main: ${manifest.main}`);
     console.log(`   ui: ${manifest.ui}`);
     
@@ -125,14 +164,59 @@ function debugBuild() {
     
     console.log(`   main file exists: ${mainExists ? '✅' : '❌'}`);
     console.log(`   ui file exists: ${uiExists ? '✅' : '❌'}`);
+    
+    if (mainExists && uiExists) {
+      console.log('✅ All manifest paths are valid');
+    }
+  } else {
+    console.log('\n❌ manifest.json not found');
   }
   
-  console.log('\n🎉 Debug complete!');
-  console.log('\n🚀 Your plugin is ready to test in Figma!');
-  console.log('   The syntax error was just a debug script limitation.');
-  console.log('   The actual code.js file is valid and should work in Figma.');
+  // Final recommendation
+  console.log('\n🎯 Build Assessment:');
   
-  return true;
+  if (!fs.existsSync(codeJsPath)) {
+    console.log('❌ Cannot assess: code.js not found');
+    return false;
+  }
+  
+  // Re-read the code content for final assessment
+  const finalCodeContent = fs.readFileSync(codeJsPath, 'utf8');
+  
+  const hasHtmlContent = finalCodeContent.includes('<!DOCTYPE html>') || finalCodeContent.includes('<html>');
+  const hasHtmlVariable = finalCodeContent.includes('__html__');
+  const hasValidStructure = finalCodeContent.includes('(()=>{') || finalCodeContent.includes('(function()');
+  const hasWebpackBundle = finalCodeContent.includes('webpack') || finalCodeContent.includes('__webpack');
+  
+  console.log(`   HTML Content: ${hasHtmlContent ? '✅' : '❌'}`);
+  console.log(`   HTML Variable: ${hasHtmlVariable ? '✅' : '❌'}`);
+  console.log(`   Valid Structure: ${hasValidStructure ? '✅' : '❌'}`);
+  console.log(`   Webpack Bundle: ${hasWebpackBundle ? '✅' : '❌'}`);
+  
+  if (hasHtmlContent && (hasHtmlVariable || hasValidStructure)) {
+    console.log('\n🎉 BUILD SUCCESS! Your plugin should work in Figma.');
+    console.log('   - HTML content is properly injected');
+    console.log('   - Code structure is valid');
+    console.log('   - Ready for testing in Figma');
+    return true;
+  } else if (hasValidStructure && !hasHtmlContent) {
+    console.log('\n⚠️  BUILD PARTIAL: Code is valid but HTML injection failed.');
+    console.log('   - Try rebuilding with the new webpack config');
+    console.log('   - Check that src/ui.html exists');
+    console.log('   - Verify webpack HTML injection plugin is working');
+    return false;
+  } else {
+    console.log('\n❌ BUILD ISSUES: There may be problems with the build.');
+    console.log('   - Check webpack configuration');
+    console.log('   - Verify all source files exist');
+    console.log('   - Try a clean rebuild: rm -rf dist && npm run build');
+    return false;
+  }
 }
 
-debugBuild();
+// Export for potential testing
+if (require.main === module) {
+  debugBuild();
+}
+
+module.exports = debugBuild;

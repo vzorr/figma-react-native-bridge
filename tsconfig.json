@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "ESNext",
+    "target": "ES5",  // Changed from ES2020 to ES5 for Figma compatibility
+    "module": "CommonJS",  // Changed from ESNext to CommonJS
     "moduleResolution": "node",
-    "lib": ["ES2020", "DOM"],
+    "lib": ["ES5", "DOM"],  // Changed from ES2020 to ES5
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": false,
@@ -29,6 +29,7 @@
     "removeComments": false,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "downlevelIteration": true,  // Added for better ES5 compatibility
     "baseUrl": "./src",
     "paths": {
       "@core/*": ["core/*"],
@@ -57,7 +58,7 @@
   "ts-node": {
     "esm": true,
     "compilerOptions": {
-      "module": "ESNext"
+      "module": "CommonJS"  // Changed from ESNext
     }
   }
 }

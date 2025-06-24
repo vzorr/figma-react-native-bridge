@@ -1,5 +1,5 @@
 // src/utils/figma-helpers.ts
-// Safe Figma API helpers with Symbol handling
+// Safe Figma API helpers with Symbol handling - FULL ORIGINAL VERSION
 
 import { logger, LogFunction } from '@core/logger';
 import { safeGetNumber, isValidNumber } from '@utils/number-utils';
@@ -30,6 +30,94 @@ export function rgbToHex(r: number, g: number, b: number): string {
 }
 
 /**
+ * NEW: Safely check for figma.mixed values (ONLY ADDITION)
+ */
+export function isNotMixed(value: any): boolean {
+  try {
+    return typeof value !== 'symbol' && value !== figma?.mixed;
+  } catch (error) {
+    return value !== undefined && value !== null;
+  }
+}
+
+/**
+ * Safely get all pages (ENHANCED with better error handling)
+ */
+export function getAllPages(): any[] {
+  const FUNC_NAME = 'getAllPages';
+  
+  try {
+    // Try to access figma.root first (newer API)
+    if (figma && 'root' in figma && figma.root && figma.root.children) {
+      return figma.root.children.filter((node: any) => node.type === 'PAGE');
+    }
+    
+    // Fallback to current page only if root is not available
+    if (figma && figma.currentPage) {
+      logger.warn(MODULE_NAME, 'getAllPages', 'figma.root not available, using current page only');
+      return [figma.currentPage];
+    }
+    
+    logger.error(MODULE_NAME, 'getAllPages', 'No Figma API access available');
+    return [];
+  } catch (error) {
+    logger.error(MODULE_NAME, 'getAllPages', 'Error accessing Figma pages:', error as Error);
+    return figma.currentPage ? [figma.currentPage] : [];
+  }
+}
+
+/**
+ * Safely get all frames from pages
+ */
+export function getAllFrames(): any[] {
+  const FUNC_NAME = 'getAllFrames';
+  
+  try {
+    const allPages = getAllPages();
+    let allFrames: any[] = [];
+    
+    allPages.forEach((page: any) => {
+      try {
+        if (page.children && Array.isArray(page.children)) {
+          const pageFrames = page.children.filter((node: any) => node.type === 'FRAME');
+          allFrames = allFrames.concat(pageFrames);
+          logger.debug(MODULE_NAME, FUNC_NAME, `Page ${page.name}: ${pageFrames.length} frames`);
+        }
+      } catch (pageError) {
+        logger.warn(MODULE_NAME, FUNC_NAME, `Error processing page ${page.name}:`, { error: pageError });
+      }
+    });
+    
+    logger.info(MODULE_NAME, FUNC_NAME, `Total frames found: ${allFrames.length}`);
+    return allFrames;
+  } catch (error) {
+    logger.error(MODULE_NAME, FUNC_NAME, 'Error getting frames:', error as Error);
+    return [];
+  }
+}
+
+/**
+ * Safely find all nodes in a page
+ */
+export function findAllNodes(page: any): any[] {
+  const FUNC_NAME = 'findAllNodes';
+  
+  try {
+    if (!page || typeof page.findAll !== 'function') {
+      logger.warn(MODULE_NAME, FUNC_NAME, 'Invalid page or no findAll method');
+      return [];
+    }
+    
+    const nodes = page.findAll();
+    logger.debug(MODULE_NAME, FUNC_NAME, `Found ${nodes.length} nodes in page ${page.name}`);
+    return nodes;
+  } catch (error) {
+    logger.error(MODULE_NAME, FUNC_NAME, 'Error finding nodes:', error as Error, { page: page?.name });
+    return [];
+  }
+}
+
+/**
  * Safely get node background color
  */
 export function getNodeBackgroundColor(node: any): string | null {
@@ -42,7 +130,7 @@ export function getNodeBackgroundColor(node: any): string | null {
 
     for (const fill of node.fills) {
       try {
-        if (fill.type === 'SOLID' && fill.color && fill.visible !== false) {
+        if (fill.type === 'SOLID' && fill.color && fill.visible !== false && isNotMixed(fill.color)) {
           const { r, g, b } = fill.color;
           if (isValidNumber(r) && isValidNumber(g) && isValidNumber(b)) {
             const hex = rgbToHex(r, g, b);
@@ -74,7 +162,7 @@ export function getNodeTextColor(node: any): string | null {
     if (node.type === 'TEXT' && 'fills' in node && node.fills && Array.isArray(node.fills)) {
       for (const fill of node.fills) {
         try {
-          if (fill.type === 'SOLID' && fill.color && fill.visible !== false) {
+          if (fill.type === 'SOLID' && fill.color && fill.visible !== false && isNotMixed(fill.color)) {
             const { r, g, b } = fill.color;
             if (isValidNumber(r) && isValidNumber(g) && isValidNumber(b)) {
               return rgbToHex(r, g, b);
@@ -116,7 +204,7 @@ export function getNodeBorderColor(node: any): string | null {
 
     for (const stroke of node.strokes) {
       try {
-        if (stroke.type === 'SOLID' && stroke.color && stroke.visible !== false) {
+        if (stroke.type === 'SOLID' && stroke.color && stroke.visible !== false && isNotMixed(stroke.color)) {
           const { r, g, b } = stroke.color;
           if (isValidNumber(r) && isValidNumber(g) && isValidNumber(b)) {
             return rgbToHex(r, g, b);
@@ -141,7 +229,7 @@ export function getNodeFontSize(node: any): number | null {
   const FUNC_NAME = 'getNodeFontSize';
   
   try {
-    if (node.type === 'TEXT' && isValidNumber(node.fontSize)) {
+    if (node.type === 'TEXT' && isValidNumber(node.fontSize) && isNotMixed(node.fontSize)) {
       return safeGetNumber(node.fontSize);
     }
     
@@ -168,7 +256,7 @@ export function getNodeFontWeight(node: any): string | null {
   try {
     if (node.type === 'TEXT' && node.fontName && typeof node.fontName === 'object') {
       // Avoid figma.mixed symbol
-      if (node.fontName !== figma?.mixed && node.fontName.style && typeof node.fontName.style === 'string') {
+      if (isNotMixed(node.fontName) && node.fontName.style && typeof node.fontName.style === 'string') {
         return node.fontName.style;
       }
     }
@@ -248,7 +336,7 @@ export function getNodeLineHeight(node: any): number | null {
   const FUNC_NAME = 'getNodeLineHeight';
   
   try {
-    if (node.type === 'TEXT' && node.lineHeight && typeof node.lineHeight === 'object') {
+    if (node.type === 'TEXT' && node.lineHeight && typeof node.lineHeight === 'object' && isNotMixed(node.lineHeight)) {
       if (isValidNumber(node.lineHeight.value)) {
         return safeGetNumber(node.lineHeight.value);
       }
@@ -394,78 +482,6 @@ export function findTextInChildren(node: any): boolean {
 }
 
 /**
- * Safely get all pages
- */
-export function getAllPages(): any[] {
-  const FUNC_NAME = 'getAllPages';
-  
-  try {
-    if (!figma || !figma.root || !figma.root.children) {
-      logger.warn(MODULE_NAME, FUNC_NAME, 'No Figma root or children available');
-      return [];
-    }
-    
-    const pages = figma.root.children.filter((node: any) => node.type === 'PAGE');
-    logger.debug(MODULE_NAME, FUNC_NAME, `Found ${pages.length} pages`);
-    return pages;
-  } catch (error) {
-    logger.error(MODULE_NAME, FUNC_NAME, 'Error getting pages:', error as Error);
-    return [];
-  }
-}
-
-/**
- * Safely get all frames from pages
- */
-export function getAllFrames(): any[] {
-  const FUNC_NAME = 'getAllFrames';
-  
-  try {
-    const allPages = getAllPages();
-    let allFrames: any[] = [];
-    
-    allPages.forEach((page: any) => {
-      try {
-        if (page.children && Array.isArray(page.children)) {
-          const pageFrames = page.children.filter((node: any) => node.type === 'FRAME');
-          allFrames = allFrames.concat(pageFrames);
-          logger.debug(MODULE_NAME, FUNC_NAME, `Page ${page.name}: ${pageFrames.length} frames`);
-        }
-      } catch (pageError) {
-        logger.warn(MODULE_NAME, FUNC_NAME, `Error processing page ${page.name}:`, { error: pageError });
-      }
-    });
-    
-    logger.info(MODULE_NAME, FUNC_NAME, `Total frames found: ${allFrames.length}`);
-    return allFrames;
-  } catch (error) {
-    logger.error(MODULE_NAME, FUNC_NAME, 'Error getting frames:', error as Error);
-    return [];
-  }
-}
-
-/**
- * Safely find all nodes in a page
- */
-export function findAllNodes(page: any): any[] {
-  const FUNC_NAME = 'findAllNodes';
-  
-  try {
-    if (!page || typeof page.findAll !== 'function') {
-      logger.warn(MODULE_NAME, FUNC_NAME, 'Invalid page or no findAll method');
-      return [];
-    }
-    
-    const nodes = page.findAll();
-    logger.debug(MODULE_NAME, FUNC_NAME, `Found ${nodes.length} nodes in page ${page.name}`);
-    return nodes;
-  } catch (error) {
-    logger.error(MODULE_NAME, FUNC_NAME, 'Error finding nodes:', error as Error, { page: page?.name });
-    return [];
-  }
-}
-
-/**
  * Send progress update to UI
  */
 export function sendProgress(progress: number): void {
@@ -490,6 +506,7 @@ export function sendProgress(progress: number): void {
 
 export default {
   rgbToHex,
+  isNotMixed,
   getNodeBackgroundColor,
   getNodeTextColor,
   getNodeBorderColor,
