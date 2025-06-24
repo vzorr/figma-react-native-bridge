@@ -1,167 +1,243 @@
 // src/main.ts
-// Figma React Native Bridge Plugin - Main Entry Point
+// Main entry point for Figma React Native Bridge Plugin
 
-import { DesignExtractor } from './extractor';
-import { ReactNativeGenerator } from './generator';
+import { logger, LogLevel } from './core/logger';
+import { ErrorHandler } from './core/error-handler';
+import { MESSAGE_TYPES } from './core/constants';
+import { ExtractValuesHandler } from './handlers/extract-values-handler';
+import { ExtractScreensHandler } from './handlers/extract-screens-handler';
 
 declare const figma: any;
 declare const __html__: string;
 
+const MODULE_NAME = 'Main';
+
 class FigmaReactNativeBridge {
-  private extractor: DesignExtractor;
-  private generator: ReactNativeGenerator;
+  private extractValuesHandler: ExtractValuesHandler;
+  private extractScreensHandler: ExtractScreensHandler;
 
   constructor() {
-    this.extractor = new DesignExtractor();
-    this.generator = new ReactNativeGenerator();
-  }
-
-  // Initialize plugin
-  init() {
-    console.log('🌉 Figma React Native Bridge Plugin loaded');
-    
-    // Show UI
-    figma.showUI(__html__, { 
-      width: 400, 
-      height: 600,
-      title: 'RN Design Bridge'
-    });
-
-    // Handle messages from UI
-    figma.ui.onmessage = (msg: any) => {
-      this.handleMessage(msg);
-    };
-  }
-
-  // Handle UI messages
-  private async handleMessage(msg: any) {
     try {
+      // Initialize handlers
+      this.extractValuesHandler = new ExtractValuesHandler();
+      this.extractScreensHandler = new ExtractScreensHandler();
+      
+      logger.info(MODULE_NAME, 'constructor', 'Figma React Native Bridge Plugin initialized');
+    } catch (error) {
+      ErrorHandler.handle(error as Error, {
+        module: MODULE_NAME,
+        function: 'constructor',
+        operation: 'plugin initialization'
+      });
+      throw error;
+    }
+  }
+
+  init(): void {
+    try {
+      logger.info(MODULE_NAME, 'init', 'Starting plugin initialization');
+      
+      // Show UI
+      figma.showUI(__html__, { 
+        width: 400, 
+        height: 600,
+        title: 'React Native Bridge'
+      });
+
+      // Set up message handling
+      figma.ui.onmessage = (msg: any) => {
+        this.handleMessage(msg).catch((error) => {
+          ErrorHandler.handle(error as Error, {
+            module: MODULE_NAME,
+            function: 'onmessage',
+            operation: 'message handling',
+            additionalData: { messageType: msg?.type }
+          });
+        });
+      };
+
+      logger.info(MODULE_NAME, 'init', 'Plugin initialization complete');
+    } catch (error) {
+      ErrorHandler.handle(error as Error, {
+        module: MODULE_NAME,
+        function: 'init',
+        operation: 'plugin UI initialization'
+      });
+    }
+  }
+
+  private async handleMessage(msg: any): Promise<void> {
+    try {
+      logger.info(MODULE_NAME, 'handleMessage', `Received message: ${msg.type}`);
+      
       switch (msg.type) {
-        case 'extract-tokens':
-          await this.handleExtractTokens();
+        case MESSAGE_TYPES.EXTRACT_VALUES:
+          await this.extractValuesHandler.handle(msg.options);
           break;
           
-        case 'extract-screens':
-          await this.handleExtractScreens();
+        case MESSAGE_TYPES.EXTRACT_SCREENS:
+          await this.extractScreensHandler.handle(msg.options);
           break;
           
-        case 'close':
+        case MESSAGE_TYPES.CLOSE:
+          logger.info(MODULE_NAME, 'handleMessage', 'Closing plugin');
           figma.closePlugin();
           break;
           
+        case MESSAGE_TYPES.GET_LOGS:
+          this.sendLogs();
+          break;
+          
+        case MESSAGE_TYPES.CLEAR_LOGS:
+          logger.clearLogs();
+          figma.ui.postMessage({
+            type: MESSAGE_TYPES.LOGS_CLEARED
+          });
+          break;
+          
+        case MESSAGE_TYPES.SET_LOG_LEVEL:
+          if (msg.level !== undefined) {
+            logger.setLevel(msg.level as LogLevel);
+            figma.ui.postMessage({
+              type: MESSAGE_TYPES.LOG_LEVEL_CHANGED,
+              level: msg.level
+            });
+          }
+          break;
+          
         default:
-          console.warn('Unknown message type:', msg.type);
+          logger.warn(MODULE_NAME, 'handleMessage', `Unknown message type: ${msg.type}`);
       }
     } catch (error) {
-      this.sendError(error instanceof Error ? error.message : 'Unknown error occurred');
+      ErrorHandler.handle(error as Error, {
+        module: MODULE_NAME,
+        function: 'handleMessage',
+        operation: 'message processing',
+        additionalData: { messageType: msg?.type, messageData: msg }
+      });
+      
+      // Send error to UI
+      figma.ui.postMessage({
+        type: MESSAGE_TYPES.ERROR,
+        error: {
+          message: 'Failed to process message',
+          context: `Message type: ${msg?.type}`,
+          timestamp: Date.now()
+        }
+      });
     }
   }
 
-  // Extract design tokens and generate theme
-  private async handleExtractTokens() {
-    this.sendProgress(10, 'Analyzing Figma design...');
-    
+  private sendLogs(): void {
     try {
-      // Extract design tokens from all pages
-      const designTokens = this.extractor.extractDesignTokens();
-      this.sendProgress(50, 'Generating responsive theme...');
+      const logs = logger.getLogs();
+      const errorSummary = logger.getErrorSummary();
+      const memoryUsage = logger.getMemoryUsage();
       
-      // Generate React Native theme
-      const theme = this.generator.generateTheme(designTokens);
-      const themeCode = this.generator.generateThemeFile(theme);
-      
-      this.sendProgress(90, 'Finalizing theme...');
-      
-      // Send results to UI
-      this.sendSuccess('tokens-extracted', {
-        tokens: {
-          colors: Array.from(designTokens.colors),
-          fontSizes: Array.from(designTokens.fontSizes),
-          spacing: Array.from(designTokens.spacing),
-          borderRadius: Array.from(designTokens.borderRadius)
-        },
-        theme,
-        themeCode
-      });
-      
-      this.sendProgress(100, 'Theme generation complete!');
-      
-    } catch (error) {
-      this.sendError(`Token extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  // Extract screens and generate components
-  private async handleExtractScreens() {
-    this.sendProgress(10, 'Finding screens in Figma...');
-    
-    try {
-      // Extract all frames as screens
-      const screens = this.extractor.extractScreens();
-      this.sendProgress(40, 'Analyzing components...');
-      
-      // Generate design tokens
-      const designTokens = this.extractor.extractDesignTokens();
-      const theme = this.generator.generateTheme(designTokens);
-      
-      this.sendProgress(70, 'Generating React Native code...');
-      
-      // Generate React Native components for each screen
-      const generatedScreens = screens.map(screen => {
-        const code = this.generator.generateScreenComponent(screen, theme);
-        return {
-          ...screen,
-          code
-        };
-      });
-      
-      this.sendProgress(90, 'Finalizing components...');
-      
-      // Send results to UI
-      this.sendSuccess('screens-extracted', {
-        screens: generatedScreens,
-        theme,
-        themeCode: this.generator.generateThemeFile(theme),
-        stats: {
-          totalScreens: generatedScreens.length,
-          totalComponents: generatedScreens.reduce((sum, screen) => sum + screen.components.length, 0)
+      figma.ui.postMessage({
+        type: MESSAGE_TYPES.LOGS_DATA,
+        data: {
+          logs,
+          errorSummary,
+          memoryUsage,
+          exportedAt: Date.now()
         }
       });
       
-      this.sendProgress(100, 'Screen generation complete!');
-      
+      logger.info(MODULE_NAME, 'sendLogs', `Sent ${logs.length} log entries to UI`);
     } catch (error) {
-      this.sendError(`Screen extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      logger.error(MODULE_NAME, 'sendLogs', 'Error sending logs to UI:', error as Error);
     }
   }
 
-  // Send progress update to UI
-  private sendProgress(progress: number, message: string) {
-    figma.ui.postMessage({
-      type: 'progress',
-      progress,
-      message
-    });
+  private sendFinalLogs(): void {
+    try {
+      const finalLogs = logger.exportLogs();
+      const errorStats = ErrorHandler.getStatistics();
+      
+      figma.ui.postMessage({
+        type: MESSAGE_TYPES.FINAL_LOGS,
+        data: {
+          logs: finalLogs,
+          errorStats,
+          pluginStats: {
+            sessionDuration: Date.now() - this.startTime,
+            totalMessages: this.messageCount,
+            finalTimestamp: Date.now()
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to send final logs:', error);
+    }
   }
 
-  // Send success result to UI
-  private sendSuccess(type: string, data: any) {
-    figma.ui.postMessage({
-      type,
-      data
-    });
-  }
+  // Session tracking
+  private startTime = Date.now();
+  private messageCount = 0;
 
-  // Send error to UI
-  private sendError(message: string) {
-    figma.ui.postMessage({
-      type: 'error',
-      message
-    });
-    console.error('Plugin Error:', message);
+  private incrementMessageCount(): void {
+    this.messageCount++;
   }
 }
 
-// Initialize plugin
-const plugin = new FigmaReactNativeBridge();
-plugin.init();
+// Error boundary for the entire plugin
+function initializePluginWithErrorHandling(): void {
+  try {
+    // Set up global error handling
+    if (typeof window !== 'undefined') {
+      window.addEventListener('error', (event) => {
+        ErrorHandler.handle(event.error, {
+          module: MODULE_NAME,
+          function: 'globalErrorHandler',
+          operation: 'global error handling',
+          additionalData: { 
+            message: event.message,
+            filename: event.filename,
+            lineno: event.lineno,
+            colno: event.colno
+          }
+        });
+      });
+
+      window.addEventListener('unhandledrejection', (event) => {
+        ErrorHandler.handle(new Error(event.reason), {
+          module: MODULE_NAME,
+          function: 'globalRejectionHandler',
+          operation: 'unhandled promise rejection',
+          additionalData: { reason: event.reason }
+        });
+      });
+    }
+
+    // Initialize and start the plugin
+    const bridge = new FigmaReactNativeBridge();
+    bridge.init();
+    
+    logger.info(MODULE_NAME, 'initializePluginWithErrorHandling', 'Plugin successfully loaded');
+    
+  } catch (error) {
+    ErrorHandler.handle(error as Error, {
+      module: MODULE_NAME,
+      function: 'initializePluginWithErrorHandling',
+      operation: 'plugin startup'
+    });
+    
+    // Try to show a basic error message to the user
+    try {
+      figma.ui.postMessage({
+        type: MESSAGE_TYPES.CRITICAL_ERROR,
+        error: {
+          message: 'Plugin failed to initialize',
+          timestamp: Date.now()
+        }
+      });
+    } catch (uiError) {
+      console.error('Critical error: Failed to initialize plugin and cannot communicate with UI:', error);
+    }
+  }
+}
+
+// Start the plugin
+logger.info(MODULE_NAME, 'startup', 'Figma React Native Bridge Plugin loading...');
+initializePluginWithErrorHandling();
