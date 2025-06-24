@@ -872,14 +872,14 @@
         <div>
           <h1 id="headerTitle">🌉 Figma → React Native Flow Bridge</h1>
           <div class="breadcrumb" id="breadcrumb">
-            <span class="breadcrumb-item" onclick="showDashboard()">Flows</span>
+            <span class="breadcrumb-item" data-action="showDashboard">Flows</span>
           </div>
         </div>
         <div class="view-toggle" id="viewToggle" style="display: none;">
-          <button class="toggle-btn active" onclick="setViewMode('grid')" id="gridViewBtn">
+          <button class="toggle-btn active" data-action="setViewMode" data-mode="grid" id="gridViewBtn">
             📊 Grid View
           </button>
-          <button class="toggle-btn" onclick="setViewMode('diagram')" id="diagramViewBtn">
+          <button class="toggle-btn" data-action="setViewMode" data-mode="diagram" id="diagramViewBtn">
             🗺️ Flow Diagram
           </button>
         </div>
@@ -905,10 +905,10 @@
         </div>
         
         <div class="button-group">
-          <button class="button" onclick="detectFlows()" id="detectFlowsBtn">
+          <button class="button" data-action="detectFlows" id="detectFlowsBtn">
             🔍 Analyze Flows & User Journeys
           </button>
-          <button class="button secondary" onclick="extractSimpleTokens()" id="extractTokensBtn">
+          <button class="button secondary" data-action="extractSimpleTokens" id="extractTokensBtn">
             🎨 Simple Token Extraction
           </button>
         </div>
@@ -930,7 +930,7 @@
       
       <!-- Flow Detail View -->
       <div id="flowDetailView" class="flow-detail" style="display: none;">
-        <div class="back-button" onclick="showDashboard()">
+        <div class="back-button" data-action="showDashboard">
           ← Back to Flows
         </div>
         
@@ -982,13 +982,13 @@
         
         <div class="action-bar">
           <div class="button-group">
-            <button class="button success" onclick="generateSelectedOption()" id="generateSelectedBtn">
+            <button class="button success" data-action="generateSelectedOption" id="generateSelectedBtn">
               🚀 Generate Selected
             </button>
-            <button class="button secondary" onclick="generateScreenCode()" id="generateScreenBtn" disabled>
+            <button class="button secondary" data-action="generateScreenCode" id="generateScreenBtn" disabled>
               🎨 Generate Selected Screen
             </button>
-            <button class="button outline" onclick="exportFlowTheme()" id="exportThemeBtn">
+            <button class="button outline" data-action="exportFlowTheme" id="exportThemeBtn">
               📦 Download Package
             </button>
           </div>
@@ -1013,7 +1013,7 @@
     <div class="modal">
       <div class="modal-header">
         <h3 class="modal-title" id="modalTitle">Generated Code Package</h3>
-        <button class="modal-close" onclick="closeCodeModal()">&times;</button>
+        <button class="modal-close" data-action="closeCodeModal">&times;</button>
       </div>
       <div class="file-tabs" id="fileTabs">
         <!-- File tabs will be populated here -->
@@ -1024,16 +1024,16 @@
         <div class="export-options">
           <div class="export-title">📦 Export Options</div>
           <div class="export-grid">
-            <div class="export-option" onclick="copyCode()">
+            <div class="export-option" data-action="copyCode">
               📋 Copy Current File
             </div>
-            <div class="export-option" onclick="downloadCurrentFile()">
+            <div class="export-option" data-action="downloadCurrentFile">
               💾 Download File
             </div>
-            <div class="export-option" onclick="downloadAllFiles()">
+            <div class="export-option" data-action="downloadAllFiles">
               📁 Download All (.zip)
             </div>
-            <div class="export-option" onclick="copyPackageStructure()">
+            <div class="export-option" data-action="copyPackageStructure">
               📦 Copy Project Structure
             </div>
           </div>
@@ -1053,8 +1053,229 @@
       detectedRoles: [],
       theme: null,
       generatedFiles: {},
-      selectedGenerationOption: 'complete-flow'
+      selectedGenerationOption: 'complete-flow',
+      currentFile: null
     };
+    
+    // Global function definitions - explicitly in global scope
+    window.detectFlows = function() {
+      console.log('detectFlows called - Global function');  
+      showLoading('Analyzing flows and detecting user roles...');
+      parent.postMessage({ pluginMessage: { type: 'detect-flows' } }, '*');
+    };
+
+    window.extractSimpleTokens = function() {
+      console.log('extractSimpleTokens called - Global function');
+      showLoading('Extracting design tokens...');
+      parent.postMessage({ pluginMessage: { type: 'extract-tokens' } }, '*');
+    };
+
+    window.selectFlow = function(flowId) {
+      const flow = currentState.flows.find(f => f.id === flowId);
+      if (!flow) return;
+      
+      currentState.selectedFlow = flow;
+      currentState.selectedScreen = null;
+      
+      showFlowDetail(flow);
+      showView('flow-detail');
+      
+      if (currentState.viewMode === 'diagram') {
+        generateFlowDiagram(flow);
+      }
+    };
+
+    window.selectScreen = function(screenName) {
+      if (!currentState.selectedFlow) return;
+      
+      const screen = currentState.selectedFlow.screens.find(s => s.name === screenName);
+      if (!screen) return;
+      
+      currentState.selectedScreen = screen;
+      
+      // Update screen selection UI
+      document.querySelectorAll('.screen-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+      
+      const selectedCard = document.querySelector(`[data-screen="${screenName}"]`);
+      if (selectedCard) {
+        selectedCard.classList.add('selected');
+      }
+      
+      // Enable screen-specific actions
+      const generateScreenBtn = document.getElementById('generateScreenBtn');
+      if (generateScreenBtn) {
+        generateScreenBtn.disabled = false;
+      }
+      
+      updateBreadcrumb();
+      
+      // Update flow diagram selection
+      if (currentState.viewMode === 'diagram') {
+        updateDiagramSelection(screenName);
+      }
+    };
+
+    window.generateSelectedOption = function() {
+      if (!currentState.selectedFlow) return;
+      
+      const option = currentState.selectedGenerationOption;
+      
+      switch (option) {
+        case 'complete-flow':
+          generateCompleteFlowPackage();
+          break;
+        case 'individual-screen':
+          if (currentState.selectedScreen) {
+            generateScreenCode();
+          } else {
+            showError('Please select a screen first');
+          }
+          break;
+        case 'theme-only':
+          exportFlowTheme();
+          break;
+        case 'project-structure':
+          generateProjectStructure();
+          break;
+      }
+    };
+
+    window.generateScreenCode = function() {
+      if (!currentState.selectedScreen || !currentState.selectedFlow) return;
+      
+      showLoading('Generating React Native screen code...');
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'generate-screen-code',
+          flowId: currentState.selectedFlow.id,
+          screenName: currentState.selectedScreen.name
+        } 
+      }, '*');
+    };
+
+    window.exportFlowTheme = function() {
+      if (!currentState.selectedFlow) return;
+      
+      showLoading('Generating flow-specific theme...');
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'export-flow-theme',
+          flowId: currentState.selectedFlow.id 
+        } 
+      }, '*');
+    };
+
+    window.showDashboard = function() {
+      currentState.selectedFlow = null;
+      currentState.selectedScreen = null;
+      showView('dashboard');
+    };
+
+    window.setViewMode = function(mode) {
+      currentState.viewMode = mode;
+      updateViewButtons();
+      
+      if (currentState.selectedFlow) {
+        if (mode === 'diagram') {
+          document.getElementById('flowDiagramSection').style.display = 'block';
+          generateFlowDiagram(currentState.selectedFlow);
+        } else {
+          document.getElementById('flowDiagramSection').style.display = 'none';
+        }
+      }
+    };
+
+    window.closeCodeModal = function() {
+      document.getElementById('codeModal').style.display = 'none';
+    };
+
+    window.switchFileTab = function(fileName) {
+      const content = currentState.generatedFiles[fileName];
+      if (!content) return;
+      
+      // Update active tab
+      document.querySelectorAll('.file-tab').forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.dataset.file === fileName) {
+          tab.classList.add('active');
+        }
+      });
+      
+      // Update content with basic syntax highlighting
+      const codePreview = document.getElementById('codePreview');
+      codePreview.innerHTML = applySyntaxHighlighting(content, getFileExtension(fileName));
+      
+      currentState.currentFile = fileName;
+    };
+
+    window.copyCode = function() {
+      const fileName = currentState.currentFile;
+      const content = currentState.generatedFiles[fileName];
+      if (content) {
+        navigator.clipboard.writeText(content).then(() => {
+          showSuccess(`✅ ${fileName} copied to clipboard!`);
+        }).catch(() => {
+          showError('❌ Failed to copy code');
+        });
+      }
+    };
+
+    window.downloadCurrentFile = function() {
+      const fileName = currentState.currentFile;
+      const content = currentState.generatedFiles[fileName];
+      if (content) {
+        downloadFile(content, fileName);
+        showSuccess(`✅ Downloaded ${fileName}`);
+      }
+    };
+
+    window.downloadAllFiles = function() {
+      // In a real implementation, this would create a zip file
+      // For now, we'll download files individually
+      Object.entries(currentState.generatedFiles).forEach(([fileName, content]) => {
+        setTimeout(() => downloadFile(content, fileName), 100);
+      });
+      showSuccess(`✅ Downloaded ${Object.keys(currentState.generatedFiles).length} files`);
+    };
+
+    window.copyPackageStructure = function() {
+      const structure = generatePackageStructure();
+      navigator.clipboard.writeText(structure).then(() => {
+        showSuccess('✅ Project structure copied to clipboard!');
+      }).catch(() => {
+        showError('❌ Failed to copy structure');
+      });
+    };
+
+    // Internal helper functions
+    function generateCompleteFlowPackage() {
+      if (!currentState.selectedFlow) return;
+      
+      showLoading('Generating complete React Native flow package...');
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'generate-flow-code',
+          flowId: currentState.selectedFlow.id,
+          includeNavigation: true,
+          includeTheme: true,
+          includeTypes: true
+        } 
+      }, '*');
+    }
+
+    function generateProjectStructure() {
+      if (!currentState.selectedFlow) return;
+      
+      showLoading('Generating project structure...');
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'generate-project-structure',
+          flowId: currentState.selectedFlow.id
+        } 
+      }, '*');
+    }
     
     // View management
     function showView(viewName) {
@@ -1071,20 +1292,6 @@
       updateViewToggle();
     }
     
-    function setViewMode(mode) {
-      currentState.viewMode = mode;
-      updateViewButtons();
-      
-      if (currentState.selectedFlow) {
-        if (mode === 'diagram') {
-          document.getElementById('flowDiagramSection').style.display = 'block';
-          generateFlowDiagram(currentState.selectedFlow);
-        } else {
-          document.getElementById('flowDiagramSection').style.display = 'none';
-        }
-      }
-    }
-    
     function updateViewButtons() {
       document.getElementById('gridViewBtn').classList.toggle('active', currentState.viewMode === 'grid');
       document.getElementById('diagramViewBtn').classList.toggle('active', currentState.viewMode === 'diagram');
@@ -1097,7 +1304,7 @@
     
     function updateBreadcrumb() {
       const breadcrumb = document.getElementById('breadcrumb');
-      let html = '<span class="breadcrumb-item" onclick="showDashboard()">Flows</span>';
+      let html = '<span class="breadcrumb-item" data-action="showDashboard">Flows</span>';
       
       if (currentState.selectedFlow) {
         html += '<span class="breadcrumb-separator">›</span>';
@@ -1112,25 +1319,23 @@
       breadcrumb.innerHTML = html;
     }
     
-    function showDashboard() {
-      currentState.selectedFlow = null;
-      currentState.selectedScreen = null;
-      showView('dashboard');
-    }
-    
     function showLoading(message) {
       document.getElementById('loadingMessage').textContent = message;
       showView('loading');
       
       // Disable buttons
-      document.getElementById('detectFlowsBtn').disabled = true;
-      document.getElementById('extractTokensBtn').disabled = true;
+      const detectBtn = document.getElementById('detectFlowsBtn');
+      const extractBtn = document.getElementById('extractTokensBtn');
+      if (detectBtn) detectBtn.disabled = true;
+      if (extractBtn) extractBtn.disabled = true;
     }
     
     function hideLoading() {
       // Re-enable buttons
-      document.getElementById('detectFlowsBtn').disabled = false;
-      document.getElementById('extractTokensBtn').disabled = false;
+      const detectBtn = document.getElementById('detectFlowsBtn');
+      const extractBtn = document.getElementById('extractTokensBtn');
+      if (detectBtn) detectBtn.disabled = false;
+      if (extractBtn) extractBtn.disabled = false;
     }
     
     function updateProgress(progress, message) {
@@ -1164,138 +1369,6 @@
           btn.textContent = `🚀 Generate ${optionTitle}`;
         });
       });
-    }
-    
-    // Main actions
-    function detectFlows() {
-      showLoading('Analyzing flows and detecting user roles...');
-      parent.postMessage({ pluginMessage: { type: 'detect-flows' } }, '*');
-    }
-    
-    function extractSimpleTokens() {
-      showLoading('Extracting design tokens...');
-      parent.postMessage({ pluginMessage: { type: 'extract-tokens' } }, '*');
-    }
-    
-    function selectFlow(flowId) {
-      const flow = currentState.flows.find(f => f.id === flowId);
-      if (!flow) return;
-      
-      currentState.selectedFlow = flow;
-      currentState.selectedScreen = null;
-      
-      showFlowDetail(flow);
-      showView('flow-detail');
-      
-      if (currentState.viewMode === 'diagram') {
-        generateFlowDiagram(flow);
-      }
-    }
-    
-    function selectScreen(screenName) {
-      if (!currentState.selectedFlow) return;
-      
-      const screen = currentState.selectedFlow.screens.find(s => s.name === screenName);
-      if (!screen) return;
-      
-      currentState.selectedScreen = screen;
-      
-      // Update screen selection UI
-      document.querySelectorAll('.screen-card').forEach(card => {
-        card.classList.remove('selected');
-      });
-      
-      const selectedCard = document.querySelector(`[data-screen="${screenName}"]`);
-      if (selectedCard) {
-        selectedCard.classList.add('selected');
-      }
-      
-      // Enable screen-specific actions
-      document.getElementById('generateScreenBtn').disabled = false;
-      
-      updateBreadcrumb();
-      
-      // Update flow diagram selection
-      if (currentState.viewMode === 'diagram') {
-        updateDiagramSelection(screenName);
-      }
-    }
-    
-    function generateSelectedOption() {
-      if (!currentState.selectedFlow) return;
-      
-      const option = currentState.selectedGenerationOption;
-      
-      switch (option) {
-        case 'complete-flow':
-          generateCompleteFlowPackage();
-          break;
-        case 'individual-screen':
-          if (currentState.selectedScreen) {
-            generateScreenCode();
-          } else {
-            showError('Please select a screen first');
-          }
-          break;
-        case 'theme-only':
-          exportFlowTheme();
-          break;
-        case 'project-structure':
-          generateProjectStructure();
-          break;
-      }
-    }
-    
-    function generateCompleteFlowPackage() {
-      if (!currentState.selectedFlow) return;
-      
-      showLoading('Generating complete React Native flow package...');
-      parent.postMessage({ 
-        pluginMessage: { 
-          type: 'generate-flow-code',
-          flowId: currentState.selectedFlow.id,
-          includeNavigation: true,
-          includeTheme: true,
-          includeTypes: true
-        } 
-      }, '*');
-    }
-    
-    function generateScreenCode() {
-      if (!currentState.selectedScreen || !currentState.selectedFlow) return;
-      
-      showLoading('Generating React Native screen code...');
-      parent.postMessage({ 
-        pluginMessage: { 
-          type: 'generate-screen-code',
-          flowId: currentState.selectedFlow.id,
-          screenName: currentState.selectedScreen.name
-        } 
-      }, '*');
-    }
-    
-    function generateProjectStructure() {
-      if (!currentState.selectedFlow) return;
-      
-      showLoading('Generating project structure...');
-      parent.postMessage({ 
-        pluginMessage: { 
-          type: 'generate-project-structure',
-          flowId: currentState.selectedFlow.id
-        } 
-      }, '*');
-    }
-    
-    function exportFlowTheme() {
-      if (!currentState.selectedFlow) return;
-      
-      showLoading('Generating flow-specific theme...');
-      parent.postMessage({ 
-        pluginMessage: { 
-          type: 'export-flow-theme',
-          flowId: currentState.selectedFlow.id 
-        } 
-      }, '*');
     }
     
     // Enhanced display functions
@@ -1343,7 +1416,7 @@
       
       // Generate flow cards
       flowsGrid.innerHTML = currentState.flows.map(flow => `
-        <div class="flow-card" onclick="selectFlow('${flow.id}')">
+        <div class="flow-card" data-action="selectFlow" data-flow-id="${flow.id}">
           <div class="flow-type-indicator type-${flow.flowType}"></div>
           <div class="flow-card-header">
             <h3 class="flow-title">${flow.name}</h3>
@@ -1405,7 +1478,7 @@
       
       // Generate enhanced screen cards
       screensGrid.innerHTML = flow.screens.map((screen, index) => `
-        <div class="screen-card" data-screen="${screen.name}" onclick="selectScreen('${screen.name}')">
+        <div class="screen-card" data-screen="${screen.name}" data-action="selectScreen" data-screen-name="${screen.name}">
           <div class="screen-preview">
             <div class="screen-mockup ${screen.deviceType}">
               <div class="screen-content">
@@ -1520,11 +1593,8 @@
         node.style.width = nodeWidth + 'px';
         node.style.height = nodeHeight + 'px';
         node.dataset.screen = screen.name;
-        
-        node.addEventListener('click', () => {
-          selectScreen(screen.name);
-          updateDiagramSelection(screen.name);
-        });
+        node.dataset.action = 'selectScreen';
+        node.dataset.screenName = screen.name;
         
         diagram.appendChild(node);
       });
@@ -1624,7 +1694,8 @@
         fileTabs.style.display = 'flex';
         fileTabs.innerHTML = fileNames.map((fileName, index) => `
           <button class="file-tab ${index === 0 || fileName === activeFile ? 'active' : ''}" 
-                  onclick="switchFileTab('${fileName}')" 
+                  data-action="switchFileTab" 
+                  data-file-name="${fileName}"
                   data-file="${fileName}">
             ${getFileIcon(fileName)} ${fileName}
           </button>
@@ -1636,29 +1707,10 @@
       // Show first file or active file
       const firstFile = activeFile || fileNames[0];
       if (firstFile) {
-        switchFileTab(firstFile);
+        window.switchFileTab(firstFile);
       }
       
       document.getElementById('codeModal').style.display = 'flex';
-    }
-    
-    function switchFileTab(fileName) {
-      const content = currentState.generatedFiles[fileName];
-      if (!content) return;
-      
-      // Update active tab
-      document.querySelectorAll('.file-tab').forEach(tab => {
-        tab.classList.remove('active');
-        if (tab.dataset.file === fileName) {
-          tab.classList.add('active');
-        }
-      });
-      
-      // Update content with basic syntax highlighting
-      const codePreview = document.getElementById('codePreview');
-      codePreview.innerHTML = applySyntaxHighlighting(content, getFileExtension(fileName));
-      
-      currentState.currentFile = fileName;
     }
     
     function getFileIcon(fileName) {
@@ -1709,50 +1761,6 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
-    }
-    
-    function closeCodeModal() {
-      document.getElementById('codeModal').style.display = 'none';
-    }
-    
-    // Enhanced export functions
-    function copyCode() {
-      const fileName = currentState.currentFile;
-      const content = currentState.generatedFiles[fileName];
-      if (content) {
-        navigator.clipboard.writeText(content).then(() => {
-          showSuccess(`✅ ${fileName} copied to clipboard!`);
-        }).catch(() => {
-          showError('❌ Failed to copy code');
-        });
-      }
-    }
-    
-    function downloadCurrentFile() {
-      const fileName = currentState.currentFile;
-      const content = currentState.generatedFiles[fileName];
-      if (content) {
-        downloadFile(content, fileName);
-        showSuccess(`✅ Downloaded ${fileName}`);
-      }
-    }
-    
-    function downloadAllFiles() {
-      // In a real implementation, this would create a zip file
-      // For now, we'll download files individually
-      Object.entries(currentState.generatedFiles).forEach(([fileName, content]) => {
-        setTimeout(() => downloadFile(content, fileName), 100);
-      });
-      showSuccess(`✅ Downloaded ${Object.keys(currentState.generatedFiles).length} files`);
-    }
-    
-    function copyPackageStructure() {
-      const structure = generatePackageStructure();
-      navigator.clipboard.writeText(structure).then(() => {
-        showSuccess('✅ Project structure copied to clipboard!');
-      }).catch(() => {
-        showError('❌ Failed to copy structure');
-      });
     }
     
     function generatePackageStructure() {
@@ -1841,14 +1849,119 @@ ${files.filter(f => f.includes('types')).map(f => `│       └── 📄 ${f}
       }, 3000);
     }
     
+    function generateThemeReadme(data) {
+      return `# Flow Theme Package
+
+Generated from Figma design: **${data.flowName || 'Unknown Flow'}**
+
+## Installation
+
+\`\`\`bash
+npm install react-native-vector-icons
+# iOS additional setup required for icons
+cd ios && pod install
+\`\`\`
+
+## Usage
+
+\`\`\`typescript
+import theme from './theme';
+
+// Use in your components
+<View style={{
+  backgroundColor: theme.COLORS.primary,
+  padding: theme.SPACING.md,
+  borderRadius: theme.BORDER_RADIUS.lg
+}}>
+  <Text style={{
+    fontSize: theme.TYPOGRAPHY.fontSize.lg,
+    color: theme.COLORS.white
+  }}>
+    Themed Component
+  </Text>
+</View>
+\`\`\`
+
+## Features
+
+- 🎨 Complete design token system
+- 📱 Responsive scaling utilities  
+- 🎯 Platform-specific adjustments
+- 🔧 Helper functions for easy usage
+
+Generated on: ${new Date(data.timestamp || Date.now()).toLocaleString()}
+`;
+    }
+    
+    // Event delegation for all data-action handlers
+    document.addEventListener('click', function(event) {
+      const target = event.target.closest('[data-action]');
+      if (!target) return;
+      
+      const action = target.dataset.action;
+      
+      switch (action) {
+        case 'detectFlows':
+          window.detectFlows();
+          break;
+        case 'extractSimpleTokens':
+          window.extractSimpleTokens();
+          break;
+        case 'selectFlow':
+          const flowId = target.dataset.flowId;
+          if (flowId) window.selectFlow(flowId);
+          break;
+        case 'selectScreen':
+          const screenName = target.dataset.screenName;
+          if (screenName) window.selectScreen(screenName);
+          break;
+        case 'generateSelectedOption':
+          window.generateSelectedOption();
+          break;
+        case 'generateScreenCode':
+          window.generateScreenCode();
+          break;
+        case 'exportFlowTheme':
+          window.exportFlowTheme();
+          break;
+        case 'showDashboard':
+          window.showDashboard();
+          break;
+        case 'setViewMode':
+          const mode = target.dataset.mode;
+          if (mode) window.setViewMode(mode);
+          break;
+        case 'closeCodeModal':
+          window.closeCodeModal();
+          break;
+        case 'switchFileTab':
+          const fileName = target.dataset.fileName;
+          if (fileName) window.switchFileTab(fileName);
+          break;
+        case 'copyCode':
+          window.copyCode();
+          break;
+        case 'downloadCurrentFile':
+          window.downloadCurrentFile();
+          break;
+        case 'downloadAllFiles':
+          window.downloadAllFiles();
+          break;
+        case 'copyPackageStructure':
+          window.copyPackageStructure();
+          break;
+      }
+    });
+    
     // Initialize the UI
     document.addEventListener('DOMContentLoaded', function() {
       setupGenerationOptions();
       updateViewButtons();
+      console.log('UI initialized successfully');
     });
     
     // Enhanced message handling from plugin
-    onmessage = function(event) {
+    window.onmessage = function(event) {
       const msg = event.data.pluginMessage;
       
       switch (msg.type) {
@@ -1919,46 +2032,7 @@ ${files.filter(f => f.includes('types')).map(f => `│       └── 📄 ${f}
       }
     };
     
-    function generateThemeReadme(data) {
-      return `# Flow Theme Package
-
-Generated from Figma design: **${data.flowName || 'Unknown Flow'}**
-
-## Installation
-
-\`\`\`bash
-npm install react-native-vector-icons
-# iOS additional setup required for icons
-cd ios && pod install
-\`\`\`
-
-## Usage
-
-\`\`\`typescript
-import theme from './theme';
-
-// Use in your components
-<View style={{
-  backgroundColor: theme.COLORS.primary,
-  padding: theme.SPACING.md,
-  borderRadius: theme.BORDER_RADIUS.lg
-}}>
-  <Text style={{
-    fontSize: theme.TYPOGRAPHY.fontSize.lg,
-    color: theme.COLORS.white
-  }}>
-    Themed Component
-  </Text>
-</View>
-\`\`\`
-
-## Features
-
-- 🎨 Complete design token system
-- 📱 Responsive scaling utilities  
-- 🎯 Platform-specific adjustments
-- 🔧 Helper functions for easy usage
-
-Generated on: ${new Date(data.timestamp).toLocaleString()}
-`;
-    }
+    console.log('All function definitions loaded successfully');
+  </script>
+</body>
+</html>
