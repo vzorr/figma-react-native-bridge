@@ -126,8 +126,8 @@ export class TypographyExtractor {
           fontSize,
           fontWeight: this.normalizeFontWeight(fontWeight),
           fontFamily: fontFamily || 'System',
-          lineHeight,
-          letterSpacing,
+          lineHeight: lineHeight || undefined,
+          letterSpacing: letterSpacing || undefined,
           usage
         });
 

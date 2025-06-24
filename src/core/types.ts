@@ -66,6 +66,8 @@ export interface ComponentData {
   level?: number;
   lineHeight?: number;
   placeholder?: string;
+  text?: string;
+  children?: ComponentData[];
 }
 
 export interface PaddingData {

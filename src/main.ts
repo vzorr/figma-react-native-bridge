@@ -8,7 +8,7 @@ import { ExtractValuesHandler } from './handlers/extract-values-handler';
 import ExtractScreensHandler from './handlers/extract-screens-handler'; // Default import
 
 declare const figma: any;
-declare const __html__: string;
+declare var __html__: string;
 
 const MODULE_NAME = 'Main';
 
@@ -37,6 +37,11 @@ class FigmaReactNativeBridge {
     try {
       logger.info(MODULE_NAME, 'init', 'Starting plugin initialization');
       
+      // Check if __html__ is available
+      if (typeof __html__ === 'undefined') {
+        throw new Error('UI HTML not found. Make sure ui.html is being injected during build.');
+      }
+      
       // Show UI
       figma.showUI(__html__, { 
         width: 400, 
@@ -58,12 +63,49 @@ class FigmaReactNativeBridge {
       };
 
       logger.info(MODULE_NAME, 'init', 'Plugin initialization complete');
+      
+      // Send initial ready message
+      setTimeout(() => {
+        try {
+          figma.ui.postMessage({
+            type: 'plugin-ready',
+            data: {
+              version: '1.0.0',
+              timestamp: Date.now(),
+              capabilities: [
+                'extract-tokens',
+                'extract-screens',
+                'generate-theme',
+                'semantic-analysis'
+              ]
+            }
+          });
+        } catch (uiError) {
+          logger.warn(MODULE_NAME, 'init', 'Failed to send ready message to UI');
+        }
+      }, 100);
+      
     } catch (error) {
       ErrorHandler.handle(error as Error, {
         module: MODULE_NAME,
         function: 'init',
         operation: 'plugin UI initialization'
       });
+      
+      // Try to show a fallback UI
+      try {
+        figma.showUI(`
+          <html>
+            <body style="padding: 20px; font-family: Arial, sans-serif;">
+              <h3>Plugin Error</h3>
+              <p>Failed to load the main UI. Please check the console for details.</p>
+              <p>Error: ${(error as Error).message}</p>
+            </body>
+          </html>
+        `, { width: 400, height: 200 });
+      } catch (fallbackError) {
+        console.error('Failed to show fallback UI:', fallbackError);
+      }
     }
   }
 
@@ -246,27 +288,6 @@ function initializePluginWithErrorHandling(): void {
     bridgeInstance.init();
     
     logger.info(MODULE_NAME, 'initializePluginWithErrorHandling', 'Plugin successfully loaded');
-    
-    // Send initial status to UI
-    setTimeout(() => {
-      try {
-        figma.ui.postMessage({
-          type: 'plugin-ready',
-          data: {
-            version: '1.0.0',
-            timestamp: Date.now(),
-            capabilities: [
-              'extract-tokens',
-              'extract-screens',
-              'generate-theme',
-              'semantic-analysis'
-            ]
-          }
-        });
-      } catch (uiError) {
-        logger.warn(MODULE_NAME, 'initializePluginWithErrorHandling', 'Failed to send ready message to UI');
-      }
-    }, 100);
     
   } catch (error) {
     ErrorHandler.handle(error as Error, {

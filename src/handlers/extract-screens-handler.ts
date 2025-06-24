@@ -428,7 +428,7 @@ export default class ExtractScreensHandler {
   }
 
   private generateEnhancedScreenCode(screenStructure: any, theme: any): string {
-    const componentName = this.sanitizeName(screenStructure.name).replace(/^./, (char) => char.toUpperCase());
+    const componentName = this.sanitizeName(screenStructure.name).replace(/^./, (char: string) => char.toUpperCase());
     
     // Generate imports based on components used
     const componentTypes = new Set<string>();
@@ -628,7 +628,7 @@ ${indent}</TouchableOpacity>`;
             jsx = `${indent}<TextInput
 ${indent}  style={[styles.input, styles.${this.sanitizeStyleName(component.name)}]}
 ${indent}  placeholder="${component.text || 'Enter text...'}"
-${indent}  placeholderTextColor={theme.colors?.gray6 || '#999999'}
+${indent}  placeholderTextColor="#999999"
 ${indent}/>`;
             break;
             

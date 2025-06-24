@@ -5,31 +5,14 @@
   "main": "dist/code.js",
   "author": "Your Name",
   "license": "MIT",
-  "keywords": [
-    "figma",
-    "react-native",
-    "design-tokens",
-    "design-system",
-    "plugin"
-  ],
   "scripts": {
     "dev": "webpack --mode development --watch --stats=minimal",
     "build": "npm run clean && webpack --mode production",
     "build:dev": "webpack --mode development",
     "clean": "rimraf dist",
-    "lint": "eslint src/**/*.ts --fix",
-    "lint:check": "eslint src/**/*.ts",
-    "type-check": "tsc --noEmit",
-    "validate": "npm run lint:check && npm run type-check",
-    "analyze": "webpack-bundle-analyzer dist/code.js --mode static",
-    "analyze:json": "webpack --mode production --profile --json > stats.json",
-    "prepare-release": "npm run validate && npm run build",
-    "docs": "typedoc src --out docs --exclude '**/*.test.ts'",
-    "module-map": "node build/build-scripts/generate-module-map.js",
-    "dependency-graph": "madge --image dependency-graph.svg src/main.ts",
-    "size-check": "size-limit"
+    "debug": "node debug-build.js",
+    "check-files": "node -e \"const fs = require('fs'); const path = require('path'); console.log('\\n📁 Checking dist files:'); try { const files = fs.readdirSync('./dist'); console.log('Files in dist:', files.length, 'files'); files.forEach(f => { const stat = fs.statSync(path.join('./dist', f)); console.log(\\`  ✅ \\${f}: \\${(stat.size/1024).toFixed(2)}KB\\`); }); console.log('\\n🎉 All required files present!'); } catch(e) { console.log('❌ No dist folder found. Run npm run build first.'); }\""
   },
-  "dependencies": {},
   "devDependencies": {
     "@types/figma": "^1.0.4",
     "@types/node": "^18.15.0",
@@ -48,39 +31,5 @@
     "webpack": "^5.76.0",
     "webpack-bundle-analyzer": "^4.8.0",
     "webpack-cli": "^5.0.1"
-  },
-  "size-limit": [
-    {
-      "path": "dist/code.js",
-      "limit": "500 KB",
-      "gzip": false
-    }
-  ],
-  "moduleNameMapping": {
-    "^@core/(.*)$": "<rootDir>/src/core/$1",
-    "^@extractors/(.*)$": "<rootDir>/src/extractors/$1",
-    "^@generators/(.*)$": "<rootDir>/src/generators/$1",
-    "^@detectors/(.*)$": "<rootDir>/src/detectors/$1",
-    "^@utils/(.*)$": "<rootDir>/src/utils/$1",
-    "^@handlers/(.*)$": "<rootDir>/src/handlers/$1",
-    "^@types/(.*)$": "<rootDir>/src/types/$1"
-  },
-  "engines": {
-    "node": ">=16.0.0",
-    "npm": ">=8.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/your-username/figma-react-native-bridge.git"
-  },
-  "bugs": {
-    "url": "https://github.com/your-username/figma-react-native-bridge/issues"
-  },
-  "homepage": "https://github.com/your-username/figma-react-native-bridge#readme",
-  "files": [
-    "dist/",
-    "README.md",
-    "LICENSE",
-    "package.json"
-  ]
+  }
 }

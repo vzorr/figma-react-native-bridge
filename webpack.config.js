@@ -1,5 +1,6 @@
 const path = require('path');
 const webpack = require('webpack');
+const fs = require('fs');
 
 module.exports = (env, argv) => {
   const isProduction = argv.mode === 'production';
@@ -10,7 +11,7 @@ module.exports = (env, argv) => {
     output: {
       filename: 'code.js',
       path: path.resolve(__dirname, 'dist'),
-      clean: true, // Clean dist folder on each build
+      clean: true,
     },
     
     resolve: {
@@ -35,7 +36,7 @@ module.exports = (env, argv) => {
               loader: 'ts-loader',
               options: {
                 configFile: 'tsconfig.json',
-                transpileOnly: !isProduction, // Skip type checking in dev for speed
+                transpileOnly: !isProduction,
               },
             },
           ],
@@ -51,20 +52,101 @@ module.exports = (env, argv) => {
         'process.env.VERSION': JSON.stringify(require('./package.json').version),
       }),
       
-      // Custom plugin to log module information
+      // Bulletproof HTML injection that handles all edge cases
+      {
+        apply: (compiler) => {
+          compiler.hooks.emit.tapAsync('BulletproofUIInjection', (compilation, callback) => {
+            try {
+              // Read the UI HTML file
+              const uiHtmlPath = path.resolve(__dirname, 'src/ui.html');
+              let uiHtmlContent = fs.readFileSync(uiHtmlPath, 'utf8');
+              
+              // Normalize line endings to Unix style first
+              uiHtmlContent = uiHtmlContent.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+              
+              // Use a more robust escaping approach
+              // Convert to Base64 and then decode in JavaScript
+              const base64Html = Buffer.from(uiHtmlContent, 'utf8').toString('base64');
+              
+              // Create the injection code that decodes Base64
+              const htmlInjection = `// Auto-generated HTML content
+var __html__ = (function() {
+  try {
+    var base64 = "${base64Html}";
+    var binary = '';
+    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    for (var i = 0; i < base64.length; i += 4) {
+      var encoded1 = chars.indexOf(base64.charAt(i));
+      var encoded2 = chars.indexOf(base64.charAt(i + 1));
+      var encoded3 = chars.indexOf(base64.charAt(i + 2));
+      var encoded4 = chars.indexOf(base64.charAt(i + 3));
+      var bitmap = (encoded1 << 18) | (encoded2 << 12) | (encoded3 << 6) | encoded4;
+      binary += String.fromCharCode((bitmap >> 16) & 255);
+      if (encoded3 !== 64) binary += String.fromCharCode((bitmap >> 8) & 255);
+      if (encoded4 !== 64) binary += String.fromCharCode(bitmap & 255);
+    }
+    return binary;
+  } catch (e) {
+    console.error('Failed to decode HTML:', e);
+    return '<html><body><h1>Error loading UI</h1></body></html>';
+  }
+})();
+
+`;
+              
+              // Get the existing code.js content and prepend the HTML
+              const codeAsset = compilation.assets['code.js'];
+              if (codeAsset) {
+                const existingCode = codeAsset.source();
+                compilation.assets['code.js'] = {
+                  source: () => htmlInjection + existingCode,
+                  size: () => (htmlInjection + existingCode).length,
+                };
+              }
+              
+              // Also copy ui.html to dist for Figma to find
+              compilation.assets['ui.html'] = {
+                source: () => uiHtmlContent,
+                size: () => uiHtmlContent.length,
+              };
+              
+              console.log('✅ UI files injected using Base64 encoding (bulletproof method)');
+              
+            } catch (error) {
+              console.error('❌ Error injecting UI files:', error);
+              
+              // Fallback: create a minimal HTML variable
+              const fallbackInjection = `var __html__ = "<html><body><h1>Plugin UI Error</h1><p>Failed to load UI. Check console.</p></body></html>";
+
+`;
+              
+              const codeAsset = compilation.assets['code.js'];
+              if (codeAsset) {
+                const existingCode = codeAsset.source();
+                compilation.assets['code.js'] = {
+                  source: () => fallbackInjection + existingCode,
+                  size: () => (fallbackInjection + existingCode).length,
+                };
+              }
+            }
+            
+            callback();
+          });
+        },
+      },
+      
       new webpack.BannerPlugin({
         banner: `
 /**
  * Figma React Native Bridge Plugin
  * Built: ${new Date().toISOString()}
  * Mode: ${argv.mode || 'development'}
- * Modules: [See console for detailed module map]
  */
         `.trim(),
         raw: false,
       }),
       
-      // Custom plugin for module tracking
+      // Module tracking plugin
       {
         apply: (compiler) => {
           compiler.hooks.emit.tapAsync('ModuleTracker', (compilation, callback) => {
@@ -131,11 +213,7 @@ module.exports = (env, argv) => {
     
     optimization: {
       minimize: isProduction,
-      
-      // Split chunks for better caching (though not needed for Figma plugins)
       splitChunks: false,
-      
-      // Remove unused exports
       usedExports: true,
       sideEffects: false,
     },
@@ -152,54 +230,18 @@ module.exports = (env, argv) => {
       chunkModules: true,
     },
     
-    // Development server (not used for Figma plugins but useful for testing)
-    devServer: {
-      static: {
-        directory: path.join(__dirname, 'dist'),
-      },
-      hot: true,
-      open: false,
-    },
-    
-    // Performance hints
     performance: {
       hints: isProduction ? 'warning' : false,
-      maxAssetSize: 500000, // 500KB
+      maxAssetSize: 500000,
       maxEntrypointSize: 500000,
     },
     
-    // External dependencies (if any)
-    externals: {
-      // figma: 'figma', // If figma was external
-    },
-    
-    // Node polyfills (disable for smaller bundle)
     node: false,
     
-    // Watch options for development
     watchOptions: {
       aggregateTimeout: 300,
       poll: false,
       ignored: /node_modules/,
     },
   };
-};
-
-// Export configuration for different environments
-module.exports.development = {
-  ...module.exports,
-  mode: 'development',
-  devtool: 'eval-source-map',
-  optimization: {
-    minimize: false,
-  },
-};
-
-module.exports.production = {
-  ...module.exports,
-  mode: 'production',
-  devtool: 'source-map',
-  optimization: {
-    minimize: true,
-  },
 };

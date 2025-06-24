@@ -425,152 +425,159 @@
     function showSuccess(message) {
       document.getElementById('success').textContent = message;
       document.getElementById('success').style.display = 'block';
-      setTimeout(() => {
+      setTimeout(function() {
         document.getElementById('success').style.display = 'none';
       }, 3000);
     }
     
     function displayTokenResults(data) {
-      const { tokens, theme, themeCode } = data;
+      var tokens = data.tokens || data.extracted;
+      var theme = data.theme;
+      var themeCode = data.fileContent;
       
-      document.getElementById('results').innerHTML = `
-        <div class="section">
-          <h3>📊 Extracted Design Tokens</h3>
-          <div class="token-grid">
-            <div class="token-item">
-              <div class="token-label">Colors</div>
-              <div class="token-values">
-                ${tokens.colors.map(color => 
-                  `<div class="color-item" style="background-color: ${color}" title="${color}"></div>`
-                ).join('')}
-              </div>
-            </div>
-            <div class="token-item">
-              <div class="token-label">Typography</div>
-              <div class="token-values">
-                ${tokens.fontSizes.map(size => 
-                  `<span class="token-value">${size}px</span>`
-                ).join('')}
-              </div>
-            </div>
-            <div class="token-item">
-              <div class="token-label">Spacing</div>
-              <div class="token-values">
-                ${tokens.spacing.map(space => 
-                  `<span class="token-value">${space}px</span>`
-                ).join('')}
-              </div>
-            </div>
-            <div class="token-item">
-              <div class="token-label">Border Radius</div>
-              <div class="token-values">
-                ${tokens.borderRadius.map(radius => 
-                  `<span class="token-value">${radius}px</span>`
-                ).join('')}
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="section">
-          <h3>🎨 Generated Theme</h3>
-          <div class="code-output">${themeCode.substring(0, 300)}...</div>
-          <div class="action-buttons">
-            <button class="button btn-small btn-copy" onclick="copyToClipboard(\`${themeCode.replace(/`/g, '\\`')}\`)">
-              📋 Copy Theme
-            </button>
-            <button class="button btn-small btn-download" onclick="downloadFile('theme.ts', \`${themeCode.replace(/`/g, '\\`')}\`)">
-              💾 Download
-            </button>
-          </div>
-        </div>
-      `;
+      var colorItems = tokens.colors.map(function(color) {
+        return '<div class="color-item" style="background-color: ' + color + '" title="' + color + '"></div>';
+      }).join('');
+      
+      var fontSizeItems = tokens.fontSizes.map(function(size) {
+        return '<span class="token-value">' + size + 'px</span>';
+      }).join('');
+      
+      var spacingItems = tokens.spacing.map(function(space) {
+        return '<span class="token-value">' + space + 'px</span>';
+      }).join('');
+      
+      var borderRadiusItems = tokens.borderRadius.map(function(radius) {
+        return '<span class="token-value">' + radius + 'px</span>';
+      }).join('');
+      
+      var escapedThemeCode = themeCode.replace(/`/g, '\\`').replace(/\$/g, '\\$');
+      
+      document.getElementById('results').innerHTML = 
+        '<div class="section">' +
+          '<h3>📊 Extracted Design Tokens</h3>' +
+          '<div class="token-grid">' +
+            '<div class="token-item">' +
+              '<div class="token-label">Colors</div>' +
+              '<div class="token-values">' + colorItems + '</div>' +
+            '</div>' +
+            '<div class="token-item">' +
+              '<div class="token-label">Typography</div>' +
+              '<div class="token-values">' + fontSizeItems + '</div>' +
+            '</div>' +
+            '<div class="token-item">' +
+              '<div class="token-label">Spacing</div>' +
+              '<div class="token-values">' + spacingItems + '</div>' +
+            '</div>' +
+            '<div class="token-item">' +
+              '<div class="token-label">Border Radius</div>' +
+              '<div class="token-values">' + borderRadiusItems + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="section">' +
+          '<h3>🎨 Generated Theme</h3>' +
+          '<div class="code-output">' + themeCode.substring(0, 300) + '...</div>' +
+          '<div class="action-buttons">' +
+            '<button class="button btn-small btn-copy" onclick="copyToClipboard(\'' + escapedThemeCode + '\')">' +
+              '📋 Copy Theme' +
+            '</button>' +
+            '<button class="button btn-small btn-download" onclick="downloadFile(\'theme.ts\', \'' + escapedThemeCode + '\')">' +
+              '💾 Download' +
+            '</button>' +
+          '</div>' +
+        '</div>';
       
       currentData = data;
     }
     
     function displayScreenResults(data) {
-      const { screens, theme, themeCode, stats } = data;
+      var screens = data.screens;
+      var theme = data.theme;
+      var themeCode = data.fileContent;
+      var stats = data.analysis ? data.analysis.overview : {};
       
-      document.getElementById('results').innerHTML = `
-        <div class="section">
-          <h3>📱 Generated Screens</h3>
-          <div class="stats">
-            <div class="stat-item">
-              <span class="stat-number">${stats.totalScreens}</span>
-              <div class="stat-label">Screens</div>
-            </div>
-            <div class="stat-item">
-              <span class="stat-number">${stats.totalComponents}</span>
-              <div class="stat-label">Components</div>
-            </div>
-          </div>
-          
-          ${screens.map((screen, index) => `
-            <div class="screen-item">
-              <div class="screen-header">
-                <div class="screen-title">${screen.name}</div>
-                <div class="screen-badge">${screen.deviceType}</div>
-              </div>
-              <div class="screen-meta">${screen.width}×${screen.height}px • ${screen.components.length} components</div>
-              <div class="code-output">${screen.code.substring(0, 200)}...</div>
-              <div class="action-buttons">
-                <button class="button btn-small btn-copy" onclick="copyToClipboard(\`${screen.code.replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`)">
-                  📋 Copy Code
-                </button>
-                <button class="button btn-small btn-download" onclick="downloadFile('${screen.name}.tsx', \`${screen.code.replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`)">
-                  💾 Download
-                </button>
-              </div>
-            </div>
-          `).join('')}
-        </div>
-        
-        <div class="section">
-          <h3>🎨 Complete Theme</h3>
-          <div class="code-output">${themeCode.substring(0, 300)}...</div>
-          <div class="action-buttons">
-            <button class="button btn-small btn-copy" onclick="copyToClipboard(\`${themeCode.replace(/`/g, '\\`')}\`)">
-              📋 Copy Theme
-            </button>
-            <button class="button btn-small btn-download" onclick="downloadFile('theme.ts', \`${themeCode.replace(/`/g, '\\`')}\`)">
-              💾 Download
-            </button>
-          </div>
-        </div>
-      `;
+      var screensHTML = screens.map(function(screen, index) {
+        var escapedCode = screen.code.replace(/`/g, '\\`').replace(/\$/g, '\\$').replace(/\\/g, '\\\\');
+        return '<div class="screen-item">' +
+          '<div class="screen-header">' +
+            '<div class="screen-title">' + screen.structure.name + '</div>' +
+            '<div class="screen-badge">' + screen.structure.deviceType + '</div>' +
+          '</div>' +
+          '<div class="screen-meta">' + screen.structure.width + '×' + screen.structure.height + 'px • ' + screen.structure.components.length + ' components</div>' +
+          '<div class="code-output">' + screen.code.substring(0, 200) + '...</div>' +
+          '<div class="action-buttons">' +
+            '<button class="button btn-small btn-copy" onclick="copyToClipboard(\'' + escapedCode + '\')">' +
+              '📋 Copy Code' +
+            '</button>' +
+            '<button class="button btn-small btn-download" onclick="downloadFile(\'' + screen.structure.name + '.tsx\', \'' + escapedCode + '\')">' +
+              '💾 Download' +
+            '</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      
+      var escapedThemeCode = themeCode.replace(/`/g, '\\`').replace(/\$/g, '\\$');
+      
+      document.getElementById('results').innerHTML = 
+        '<div class="section">' +
+          '<h3>📱 Generated Screens</h3>' +
+          '<div class="stats">' +
+            '<div class="stat-item">' +
+              '<span class="stat-number">' + (stats.totalScreens || screens.length) + '</span>' +
+              '<div class="stat-label">Screens</div>' +
+            '</div>' +
+            '<div class="stat-item">' +
+              '<span class="stat-number">' + (stats.totalComponents || 0) + '</span>' +
+              '<div class="stat-label">Components</div>' +
+            '</div>' +
+          '</div>' +
+          screensHTML +
+        '</div>' +
+        '<div class="section">' +
+          '<h3>🎨 Complete Theme</h3>' +
+          '<div class="code-output">' + themeCode.substring(0, 300) + '...</div>' +
+          '<div class="action-buttons">' +
+            '<button class="button btn-small btn-copy" onclick="copyToClipboard(\'' + escapedThemeCode + '\')">' +
+              '📋 Copy Theme' +
+            '</button>' +
+            '<button class="button btn-small btn-download" onclick="downloadFile(\'theme.ts\', \'' + escapedThemeCode + '\')">' +
+              '💾 Download' +
+            '</button>' +
+          '</div>' +
+        '</div>';
       
       currentData = data;
     }
     
     function copyToClipboard(text) {
-      navigator.clipboard.writeText(text).then(() => {
+      navigator.clipboard.writeText(text).then(function() {
         showSuccess('✅ Copied to clipboard!');
-      }).catch(() => {
+      }).catch(function() {
         showError('❌ Failed to copy to clipboard');
       });
     }
     
     function downloadFile(filename, content) {
       try {
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        var blob = new Blob([content], { type: 'text/plain' });
+        var url = window.URL.createObjectURL(blob);
+        var a = document.createElement('a');
         a.href = url;
         a.download = filename;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-        showSuccess(`✅ Downloaded ${filename}`);
+        showSuccess('✅ Downloaded ' + filename);
       } catch (error) {
         showError('❌ Failed to download file');
       }
     }
     
     // Handle messages from plugin
-    onmessage = (event) => {
-      const msg = event.data.pluginMessage;
+    onmessage = function(event) {
+      var msg = event.data.pluginMessage;
       
       switch (msg.type) {
         case 'progress':
@@ -578,6 +585,7 @@
           break;
           
         case 'tokens-extracted':
+        case 'extraction-complete':
           hideLoading();
           document.getElementById('results').style.display = 'block';
           displayTokenResults(msg.data);
@@ -593,7 +601,7 @@
           
         case 'error':
           hideLoading();
-          showError(msg.message);
+          showError(msg.message || msg.error);
           break;
       }
     };
