@@ -244,3 +244,120 @@ export default {
   BUILD_INFO,
   ENVIRONMENT
 };
+
+// Flow detection patterns
+export const FLOW_PATTERNS = {
+  userRoles: {
+    customer: ['customer', 'client', 'user', 'buyer', 'shopper', 'guest'],
+    admin: ['admin', 'administrator', 'manager', 'super', 'root'],
+    operator: ['operator', 'staff', 'employee', 'worker', 'agent'],
+    guest: ['guest', 'visitor', 'anonymous', 'public', 'unauth'],
+    moderator: ['moderator', 'mod', 'supervisor', 'reviewer']
+  },
+  
+  flowTypes: {
+    onboarding: ['onboarding', 'welcome', 'intro', 'getting_started', 'tutorial'],
+    authentication: ['login', 'signup', 'register', 'auth', 'signin', 'password'],
+    main_feature: ['dashboard', 'home', 'main', 'browse', 'search', 'explore'],
+    settings: ['settings', 'preferences', 'config', 'profile', 'account'],
+    checkout: ['checkout', 'cart', 'payment', 'billing', 'order', 'purchase'],
+    unknown: []
+  },
+  
+  navigationPatterns: {
+    stack: ['flow', 'step', 'next', 'back', 'continue'],
+    tab: ['tab', 'section', 'category', 'filter'],
+    modal: ['modal', 'popup', 'overlay', 'dialog', 'alert'],
+    drawer: ['menu', 'nav', 'drawer', 'sidebar']
+  },
+  
+  sequenceIndicators: [
+    /step[-_\s]*\d+/i,
+    /page[-_\s]*\d+/i,
+    /screen[-_\s]*\d+/i,
+    /\d+[-_]of[-_]\d+/i,
+    /v\d+/i,
+    /[-_]\d+$/, // ends with number after separator
+    /^\d+[-_]/, // starts with number and separator
+  ]
+} as const;
+
+// Role-based design system preferences
+export const ROLE_BASED_DESIGN = {
+  customer: {
+    primaryColors: ['#007AFF', '#34C759', '#FF9500'], // iOS system colors
+    navigationStyle: 'bottom_tabs',
+    informationDensity: 'comfortable',
+    interactionComplexity: 'simple',
+    visualHierarchy: 'clear_primary_actions'
+  },
+  
+  admin: {
+    primaryColors: ['#6C757D', '#343A40', '#007BFF'], // Professional grays and blue
+    navigationStyle: 'sidebar',
+    informationDensity: 'dense',
+    interactionComplexity: 'complex',
+    visualHierarchy: 'data_focused'
+  },
+  
+  operator: {
+    primaryColors: ['#28A745', '#FFC107', '#DC3545'], // Status colors
+    navigationStyle: 'top_tabs',
+    informationDensity: 'compact',
+    interactionComplexity: 'efficient',
+    visualHierarchy: 'action_oriented'
+  },
+  
+  guest: {
+    primaryColors: ['#667eea', '#764ba2', '#f093fb'], // Gradients and welcoming
+    navigationStyle: 'simple_stack',
+    informationDensity: 'spacious',
+    interactionComplexity: 'minimal',
+    visualHierarchy: 'conversion_focused'
+  }
+} as const;
+
+// Flow detection confidence thresholds
+export const DETECTION_THRESHOLDS = {
+  role: {
+    high_confidence: 0.8,
+    medium_confidence: 0.6,
+    low_confidence: 0.4,
+    minimum_viable: 0.3
+  },
+  
+  flow: {
+    sequence_detection: 0.7,
+    naming_pattern: 0.6,
+    parent_context: 0.5,
+    content_analysis: 0.4
+  },
+  
+  navigation: {
+    prototype_links: 0.9,
+    naming_convention: 0.7,
+    spatial_relationship: 0.5,
+    content_similarity: 0.4
+  }
+} as const;
+
+// Enhanced message types for flow functionality
+export const FLOW_MESSAGE_TYPES = {
+  // Flow detection
+  DETECT_FLOWS: 'detect-flows',
+  FLOWS_DETECTED: 'flows-detected',
+  
+  // Flow selection and navigation
+  SELECT_FLOW: 'select-flow',
+  FLOW_SELECTED: 'flow-selected',
+  SELECT_SCREEN_IN_FLOW: 'select-screen-in-flow',
+  
+  // Role-based operations
+  ANALYZE_USER_ROLES: 'analyze-user-roles',
+  ROLES_ANALYZED: 'roles-analyzed',
+  
+  // Flow-aware generation
+  GENERATE_FLOW_THEME: 'generate-flow-theme',
+  GENERATE_FLOW_NAVIGATION: 'generate-flow-navigation',
+  FLOW_CODE_GENERATED: 'flow-code-generated'
+} as const;

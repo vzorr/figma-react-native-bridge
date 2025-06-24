@@ -2,57 +2,397 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Figma React Native Bridge</title>
+  <title>Figma React Native Bridge - Flow Navigator</title>
   <style>
     * { box-sizing: border-box; }
     
     body { 
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      padding: 20px; 
+      padding: 0; 
       margin: 0;
       background: #f7f8fa;
       font-size: 13px;
       line-height: 1.4;
+      height: 100vh;
+      overflow: hidden;
     }
     
-    .container { max-width: 100%; }
+    .app-container { 
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
     
-    h1 {
-      font-size: 18px;
+    /* Header with breadcrumbs */
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px 20px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .header h1 {
+      font-size: 16px;
       font-weight: 600;
       margin: 0 0 8px 0;
-      color: #333;
     }
     
-    .subtitle {
-      color: #666;
-      margin-bottom: 24px;
+    .breadcrumb {
       font-size: 12px;
+      opacity: 0.9;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .breadcrumb-item {
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    
+    .breadcrumb-item:hover {
+      background: rgba(255,255,255,0.1);
+    }
+    
+    .breadcrumb-separator {
+      opacity: 0.6;
+    }
+    
+    /* Main content area */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+    }
+    
+    /* Loading and error states */
+    .loading { 
+      text-align: center; 
+      padding: 64px 20px; 
+      color: #666;
+    }
+    
+    .loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid #f3f4f6;
+      border-top: 3px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 12px 0;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: rgba(255,255,255,0.8);
+      transition: width 0.3s ease;
+      width: 0%;
+      border-radius: 2px;
+    }
+    
+    .error, .success {
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin: 16px 0;
+      font-size: 12px;
+    }
+    
+    .error {
+      background: #fee;
+      color: #c33;
+      border: 1px solid #fcc;
+    }
+    
+    .success {
+      background: #efe;
+      color: #363;
+      border: 1px solid #cfc;
+    }
+    
+    /* Flow Dashboard */
+    .dashboard {
+      max-width: 100%;
+    }
+    
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+    }
+    
+    .dashboard-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin: 0;
+    }
+    
+    .dashboard-stats {
+      display: flex;
+      gap: 16px;
+      font-size: 12px;
+      color: #666;
+    }
+    
+    .stat-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .flows-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      margin: 20px 0;
+    }
+    
+    .flow-card {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e1e8ed;
+      padding: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .flow-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+      border-color: #667eea;
+    }
+    
+    .flow-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    
+    .flow-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin: 0;
+      line-height: 1.3;
+    }
+    
+    .flow-role-badge {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .role-customer { background: #e3f2fd; color: #1976d2; }
+    .role-admin { background: #fff3e0; color: #f57c00; }
+    .role-operator { background: #e8f5e8; color: #388e3c; }
+    .role-guest { background: #f3e5f5; color: #7b1fa2; }
+    
+    .flow-meta {
+      display: flex;
+      gap: 16px;
+      margin: 12px 0;
+      font-size: 11px;
+      color: #666;
+    }
+    
+    .flow-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    
+    .flow-description {
+      font-size: 12px;
+      color: #666;
+      margin: 8px 0;
+      line-height: 1.4;
+    }
+    
+    .flow-type-indicator {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 4px;
+      height: 100%;
+    }
+    
+    .type-onboarding { background: linear-gradient(180deg, #4caf50, #8bc34a); }
+    .type-authentication { background: linear-gradient(180deg, #ff9800, #ffc107); }
+    .type-main_feature { background: linear-gradient(180deg, #2196f3, #03a9f4); }
+    .type-settings { background: linear-gradient(180deg, #9c27b0, #e91e63); }
+    .type-checkout { background: linear-gradient(180deg, #f44336, #ff5722); }
+    .type-unknown { background: linear-gradient(180deg, #607d8b, #90a4ae); }
+    
+    /* Flow Detail View */
+    .flow-detail {
+      max-width: 100%;
+    }
+    
+    .flow-detail-header {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e1e8ed;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .flow-detail-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #333;
+      margin: 0 0 8px 0;
+    }
+    
+    .flow-detail-meta {
+      display: flex;
+      gap: 20px;
+      font-size: 12px;
+      color: #666;
+      margin: 12px 0;
+    }
+    
+    .screens-section {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e1e8ed;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    .screens-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    
+    .screens-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin: 0;
+    }
+    
+    .screens-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+    }
+    
+    .screen-card {
+      border: 2px solid #e1e8ed;
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: white;
+    }
+    
+    .screen-card:hover {
+      border-color: #667eea;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    }
+    
+    .screen-card.selected {
+      border-color: #667eea;
+      box-shadow: 0 0 0 1px #667eea;
+    }
+    
+    .screen-preview {
+      height: 120px;
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: #666;
+      position: relative;
+    }
+    
+    .screen-device-indicator {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 10px;
+      background: rgba(255,255,255,0.8);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    
+    .screen-info {
+      padding: 12px;
+    }
+    
+    .screen-name {
+      font-size: 12px;
+      font-weight: 500;
+      color: #333;
+      margin: 0 0 4px 0;
+    }
+    
+    .screen-meta {
+      font-size: 10px;
+      color: #666;
+      display: flex;
+      justify-content: space-between;
+    }
+    
+    /* Action Buttons */
+    .action-bar {
+      background: white;
+      border-radius: 12px;
+      border: 1px solid #e1e8ed;
+      padding: 20px;
+      margin-top: 20px;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
     }
     
     .button { 
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white; 
       border: none; 
-      padding: 14px 20px; 
+      padding: 12px 20px; 
       border-radius: 8px; 
       cursor: pointer;
       font-size: 13px;
       font-weight: 500;
-      margin: 8px 0;
-      width: 100%;
       transition: all 0.2s ease;
-      position: relative;
-      overflow: hidden;
+      flex: 1;
+      min-width: 140px;
     }
     
     .button:hover { 
       transform: translateY(-1px);
       box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-    }
-    
-    .button:active {
-      transform: translateY(0);
     }
     
     .button:disabled {
@@ -66,542 +406,691 @@
       background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
     }
     
-    .section { 
-      margin: 20px 0; 
-      padding: 16px; 
-      background: white; 
-      border-radius: 12px;
-      border: 1px solid #e1e8ed;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    }
-    
-    .section h3 { 
-      margin: 0 0 12px 0; 
-      color: #333;
-      font-size: 14px;
-      font-weight: 600;
-    }
-    
-    .loading { 
-      text-align: center; 
-      padding: 32px 16px; 
-      color: #666;
-      background: white;
-      border-radius: 12px;
-      border: 1px solid #e1e8ed;
-    }
-    
-    .loading-spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid #f3f4f6;
-      border-top: 3px solid #667eea;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 16px;
-    }
-    
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    
-    .progress-bar {
-      width: 100%;
-      height: 6px;
-      background: #f1f3f4;
-      border-radius: 3px;
-      overflow: hidden;
-      margin: 16px 0;
-    }
-    
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #667eea, #764ba2);
-      transition: width 0.3s ease;
-      width: 0%;
-      border-radius: 3px;
-    }
-    
-    .token-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin: 12px 0;
-    }
-    
-    .token-item {
-      background: #f8f9fa;
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid #e9ecef;
-    }
-    
-    .token-label {
-      font-size: 11px;
-      font-weight: 600;
-      color: #666;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
-    }
-    
-    .token-values {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-    }
-    
-    .token-value {
-      background: #e9ecef;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-family: 'SF Mono', Monaco, monospace;
-    }
-    
-    .color-item {
-      width: 20px;
-      height: 20px;
-      border-radius: 4px;
-      display: inline-block;
-      margin: 2px;
-      border: 1px solid #ddd;
-      position: relative;
-    }
-    
-    .color-item:hover::after {
-      content: attr(title);
-      position: absolute;
-      bottom: -22px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #333;
-      color: white;
-      padding: 2px 6px;
-      border-radius: 3px;
-      font-size: 10px;
-      white-space: nowrap;
-      z-index: 1000;
-    }
-    
-    .code-output {
-      background: #f8f9fa;
-      border: 1px solid #e9ecef;
-      border-radius: 6px;
-      padding: 12px;
-      font-family: 'SF Mono', Monaco, monospace;
-      font-size: 10px;
-      max-height: 120px;
-      overflow-y: auto;
-      white-space: pre-wrap;
-      line-height: 1.4;
-      margin: 12px 0;
-    }
-    
-    .stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
-      margin: 12px 0;
-    }
-    
-    .stat-item {
-      text-align: center;
-      padding: 12px;
-      background: #f8f9fa;
-      border-radius: 8px;
-      border: 1px solid #e9ecef;
-    }
-    
-    .stat-number {
-      font-size: 20px;
-      font-weight: 700;
-      color: #667eea;
-      display: block;
-    }
-    
-    .stat-label {
-      font-size: 11px;
-      color: #666;
-      margin-top: 4px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .action-buttons {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
-    }
-    
-    .btn-small {
-      padding: 8px 12px;
-      font-size: 11px;
-      flex: 1;
-      margin: 0;
-    }
-    
-    .btn-copy {
+    .button.success {
       background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
     }
     
-    .btn-download {
-      background: linear-gradient(135deg, #e17055 0%, #d63031 100%);
+    .button.outline {
+      background: transparent;
+      color: #667eea;
+      border: 2px solid #667eea;
     }
     
-    .screen-item {
-      background: #f8f9fa;
-      border: 1px solid #e9ecef;
-      border-radius: 8px;
-      padding: 12px;
-      margin: 8px 0;
+    .button.outline:hover {
+      background: #667eea;
+      color: white;
     }
     
-    .screen-header {
+    /* Back button */
+    .back-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255,255,255,0.1);
+      color: white;
+      border: 1px solid rgba(255,255,255,0.2);
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s ease;
+      margin-bottom: 16px;
+    }
+    
+    .back-button:hover {
+      background: rgba(255,255,255,0.2);
+    }
+    
+    /* Empty states */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+    
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+      opacity: 0.5;
+    }
+    
+    .empty-state-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #333;
+    }
+    
+    .empty-state-description {
+      font-size: 13px;
+      line-height: 1.5;
+      max-width: 300px;
+      margin: 0 auto;
+    }
+    
+    /* Responsive */
+    @media (max-width: 600px) {
+      .flows-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .screens-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      }
+      
+      .button-group {
+        flex-direction: column;
+      }
+      
+      .button {
+        min-width: auto;
+      }
+    }
+    
+    /* Code preview modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.7);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .modal {
+      background: white;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 600px;
+      max-height: 80%;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .modal-header {
+      padding: 20px;
+      border-bottom: 1px solid #e1e8ed;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 8px;
     }
     
-    .screen-title {
+    .modal-title {
+      font-size: 16px;
       font-weight: 600;
-      color: #333;
-      font-size: 13px;
+      margin: 0;
     }
     
-    .screen-badge {
-      background: #667eea;
-      color: white;
-      padding: 2px 6px;
-      border-radius: 4px;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    
-    .screen-meta {
-      font-size: 11px;
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
       color: #666;
-      margin-bottom: 8px;
     }
     
-    .error {
-      background: #fee;
-      color: #c33;
-      padding: 12px;
-      border-radius: 6px;
-      border: 1px solid #fcc;
-      margin: 12px 0;
-      font-size: 12px;
-    }
-    
-    .success {
-      background: #efe;
-      color: #363;
-      padding: 12px;
-      border-radius: 6px;
-      border: 1px solid #cfc;
-      margin: 12px 0;
-      font-size: 12px;
-    }
-
-    .hero {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
+    .modal-body {
+      flex: 1;
+      overflow-y: auto;
       padding: 20px;
-      border-radius: 12px;
-      margin-bottom: 20px;
-      text-align: center;
     }
-
-    .hero h1 {
-      color: white;
-      margin-bottom: 8px;
-    }
-
-    .feature-list {
-      list-style: none;
-      padding: 0;
-      margin: 16px 0;
-    }
-
-    .feature-list li {
-      padding: 8px 0;
-      font-size: 12px;
-      color: rgba(255,255,255,0.9);
-    }
-
-    .feature-list li:before {
-      content: "✨";
-      margin-right: 8px;
+    
+    .code-preview {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 6px;
+      padding: 16px;
+      font-family: 'SF Mono', Monaco, monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      overflow-x: auto;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="hero">
-      <h1>🌉 Figma → React Native</h1>
-      <p class="subtitle" style="color: rgba(255,255,255,0.8); margin-bottom: 0;">Transform designs into responsive, production-ready code</p>
-      <ul class="feature-list">
-        <li>Auto-detect device types (Mobile, Tablet, Desktop)</li>
-        <li>Generate responsive design systems</li>
-        <li>Extract semantic design tokens</li>
-        <li>Create React Native components</li>
-      </ul>
-    </div>
-    
-    <button class="button" onclick="extractTokens()" id="extractTokensBtn">
-      🎨 Extract Design System
-    </button>
-    
-    <button class="button secondary" onclick="extractScreens()" id="extractScreensBtn">
-      📱 Generate React Native Screens
-    </button>
-    
-    <div id="loading" class="loading" style="display: none;">
-      <div class="loading-spinner"></div>
-      <div id="loadingMessage">Processing your Figma design...</div>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progressFill"></div>
+  <div class="app-container">
+    <!-- Header with breadcrumbs -->
+    <div class="header">
+      <h1 id="headerTitle">🌉 Figma → React Native Flow Bridge</h1>
+      <div class="breadcrumb" id="breadcrumb">
+        <span class="breadcrumb-item" onclick="showDashboard()">Flows</span>
+      </div>
+      <div class="progress-bar" id="globalProgress" style="display: none;">
+        <div class="progress-fill" id="globalProgressFill"></div>
       </div>
     </div>
     
-    <div id="results" style="display: none;">
-      <!-- Results will be populated here -->
+    <!-- Main content area -->
+    <div class="content" id="mainContent">
+      
+      <!-- Initial Dashboard View -->
+      <div id="dashboardView" class="dashboard">
+        <div class="dashboard-header">
+          <h2 class="dashboard-title">Detect User Flows</h2>
+          <div class="dashboard-stats" id="dashboardStats">
+            <div class="stat-item">
+              <span>🎯</span>
+              <span>Advanced Flow Detection</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="button-group">
+          <button class="button" onclick="detectFlows()" id="detectFlowsBtn">
+            🔍 Analyze Flows & User Journeys
+          </button>
+          <button class="button secondary" onclick="extractSimpleTokens()" id="extractTokensBtn">
+            🎨 Simple Token Extraction
+          </button>
+        </div>
+        
+        <div id="flowsContainer" style="display: none;">
+          <div class="flows-grid" id="flowsGrid">
+            <!-- Flow cards will be populated here -->
+          </div>
+        </div>
+        
+        <div class="empty-state" id="emptyState">
+          <div class="empty-state-icon">🎯</div>
+          <div class="empty-state-title">Ready to Detect Flows</div>
+          <div class="empty-state-description">
+            Analyze your Figma design to automatically detect user flows, roles, and generate production-ready React Native code with intelligent design systems.
+          </div>
+        </div>
+      </div>
+      
+      <!-- Flow Detail View -->
+      <div id="flowDetailView" class="flow-detail" style="display: none;">
+        <div class="back-button" onclick="showDashboard()">
+          ← Back to Flows
+        </div>
+        
+        <div class="flow-detail-header" id="flowDetailHeader">
+          <!-- Flow details will be populated here -->
+        </div>
+        
+        <div class="screens-section">
+          <div class="screens-header">
+            <h3 class="screens-title">Screens in Flow</h3>
+            <span id="screenCount" class="badge"></span>
+          </div>
+          <div class="screens-grid" id="screensGrid">
+            <!-- Screen cards will be populated here -->
+          </div>
+        </div>
+        
+        <div class="action-bar">
+          <div class="button-group">
+            <button class="button success" onclick="generateFlowCode()" id="generateFlowBtn">
+              📱 Generate React Native Flow
+            </button>
+            <button class="button secondary" onclick="generateSelectedScreen()" id="generateScreenBtn" disabled>
+              🎨 Generate Selected Screen
+            </button>
+            <button class="button outline" onclick="exportFlowTheme()" id="exportThemeBtn">
+              🎨 Export Flow Theme
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Loading State -->
+      <div id="loadingView" class="loading" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div id="loadingMessage">Analyzing your design flows...</div>
+      </div>
+      
     </div>
     
-    <div id="error" class="error" style="display: none;"></div>
-    <div id="success" class="success" style="display: none;"></div>
+    <!-- Error and Success Messages -->
+    <div id="errorMessage" class="error" style="display: none;"></div>
+    <div id="successMessage" class="success" style="display: none;"></div>
+  </div>
+  
+  <!-- Code Preview Modal -->
+  <div id="codeModal" class="modal-overlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTitle">Generated Code</h3>
+        <button class="modal-close" onclick="closeCodeModal()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="code-preview" id="codePreview"></div>
+        <div class="button-group" style="margin-top: 16px;">
+          <button class="button success" onclick="copyCode()">📋 Copy Code</button>
+          <button class="button secondary" onclick="downloadCode()">💾 Download File</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script>
-    let currentData = null;
+    // Global state management
+    let currentState = {
+      view: 'dashboard', // 'dashboard', 'flow-detail'
+      flows: [],
+      selectedFlow: null,
+      selectedScreen: null,
+      detectedRoles: [],
+      theme: null,
+      generatedCode: ''
+    };
     
-    function extractTokens() {
-      showLoading('Extracting design tokens...');
-      parent.postMessage({ pluginMessage: { type: 'extract-tokens' } }, '*');
+    // View management
+    function showView(viewName) {
+      // Hide all views
+      document.getElementById('dashboardView').style.display = 'none';
+      document.getElementById('flowDetailView').style.display = 'none';
+      document.getElementById('loadingView').style.display = 'none';
+      
+      // Show selected view
+      document.getElementById(viewName + 'View').style.display = 'block';
+      currentState.view = viewName;
+      
+      updateBreadcrumb();
     }
     
-    function extractScreens() {
-      showLoading('Extracting screens and components...');
-      parent.postMessage({ pluginMessage: { type: 'extract-screens' } }, '*');
+    function updateBreadcrumb() {
+      const breadcrumb = document.getElementById('breadcrumb');
+      let html = '<span class="breadcrumb-item" onclick="showDashboard()">Flows</span>';
+      
+      if (currentState.selectedFlow) {
+        html += '<span class="breadcrumb-separator">›</span>';
+        html += `<span class="breadcrumb-item">${currentState.selectedFlow.name}</span>`;
+      }
+      
+      if (currentState.selectedScreen) {
+        html += '<span class="breadcrumb-separator">›</span>';
+        html += `<span class="breadcrumb-item">${currentState.selectedScreen.name}</span>`;
+      }
+      
+      breadcrumb.innerHTML = html;
+    }
+    
+    function showDashboard() {
+      currentState.selectedFlow = null;
+      currentState.selectedScreen = null;
+      showView('dashboard');
     }
     
     function showLoading(message) {
       document.getElementById('loadingMessage').textContent = message;
-      document.getElementById('loading').style.display = 'block';
-      document.getElementById('results').style.display = 'none';
+      showView('loading');
+      
+      // Disable buttons
+      document.getElementById('detectFlowsBtn').disabled = true;
       document.getElementById('extractTokensBtn').disabled = true;
-      document.getElementById('extractScreensBtn').disabled = true;
-      hideMessages();
     }
     
     function hideLoading() {
-      document.getElementById('loading').style.display = 'none';
+      // Re-enable buttons
+      document.getElementById('detectFlowsBtn').disabled = false;
       document.getElementById('extractTokensBtn').disabled = false;
-      document.getElementById('extractScreensBtn').disabled = false;
     }
     
     function updateProgress(progress, message) {
-      document.getElementById('progressFill').style.width = progress + '%';
+      const progressBar = document.getElementById('globalProgress');
+      const progressFill = document.getElementById('globalProgressFill');
+      
+      if (progress > 0) {
+        progressBar.style.display = 'block';
+        progressFill.style.width = progress + '%';
+      } else {
+        progressBar.style.display = 'none';
+      }
+      
       if (message) {
         document.getElementById('loadingMessage').textContent = message;
       }
     }
     
-    function hideMessages() {
-      document.getElementById('error').style.display = 'none';
-      document.getElementById('success').style.display = 'none';
+    // Main actions
+    function detectFlows() {
+      showLoading('Analyzing flows and detecting user roles...');
+      parent.postMessage({ pluginMessage: { type: 'detect-flows' } }, '*');
     }
     
-    function showError(message) {
-      document.getElementById('error').textContent = message;
-      document.getElementById('error').style.display = 'block';
-      hideLoading();
+    function extractSimpleTokens() {
+      showLoading('Extracting design tokens...');
+      parent.postMessage({ pluginMessage: { type: 'extract-tokens' } }, '*');
     }
     
-    function showSuccess(message) {
-      document.getElementById('success').textContent = message;
-      document.getElementById('success').style.display = 'block';
-      setTimeout(function() {
-        document.getElementById('success').style.display = 'none';
-      }, 3000);
+    function selectFlow(flowId) {
+      const flow = currentState.flows.find(f => f.id === flowId);
+      if (!flow) return;
+      
+      currentState.selectedFlow = flow;
+      currentState.selectedScreen = null;
+      
+      showFlowDetail(flow);
+      showView('flow-detail');
     }
     
-    function displayTokenResults(data) {
-      var tokens = data.tokens || data.extracted;
-      var theme = data.theme;
-      var themeCode = data.fileContent;
+    function selectScreen(screenName) {
+      if (!currentState.selectedFlow) return;
       
-      var colorItems = tokens.colors.map(function(color) {
-        return '<div class="color-item" style="background-color: ' + color + '" title="' + color + '"></div>';
-      }).join('');
+      const screen = currentState.selectedFlow.screens.find(s => s.name === screenName);
+      if (!screen) return;
       
-      var fontSizeItems = tokens.fontSizes.map(function(size) {
-        return '<span class="token-value">' + size + 'px</span>';
-      }).join('');
+      currentState.selectedScreen = screen;
       
-      var spacingItems = tokens.spacing.map(function(space) {
-        return '<span class="token-value">' + space + 'px</span>';
-      }).join('');
+      // Update screen selection UI
+      document.querySelectorAll('.screen-card').forEach(card => {
+        card.classList.remove('selected');
+      });
       
-      var borderRadiusItems = tokens.borderRadius.map(function(radius) {
-        return '<span class="token-value">' + radius + 'px</span>';
-      }).join('');
+      const selectedCard = document.querySelector(`[data-screen="${screenName}"]`);
+      if (selectedCard) {
+        selectedCard.classList.add('selected');
+      }
       
-      var escapedThemeCode = themeCode.replace(/`/g, '\\`').replace(/\$/g, '\\$');
+      // Enable screen-specific actions
+      document.getElementById('generateScreenBtn').disabled = false;
       
-      document.getElementById('results').innerHTML = 
-        '<div class="section">' +
-          '<h3>📊 Extracted Design Tokens</h3>' +
-          '<div class="token-grid">' +
-            '<div class="token-item">' +
-              '<div class="token-label">Colors</div>' +
-              '<div class="token-values">' + colorItems + '</div>' +
-            '</div>' +
-            '<div class="token-item">' +
-              '<div class="token-label">Typography</div>' +
-              '<div class="token-values">' + fontSizeItems + '</div>' +
-            '</div>' +
-            '<div class="token-item">' +
-              '<div class="token-label">Spacing</div>' +
-              '<div class="token-values">' + spacingItems + '</div>' +
-            '</div>' +
-            '<div class="token-item">' +
-              '<div class="token-label">Border Radius</div>' +
-              '<div class="token-values">' + borderRadiusItems + '</div>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
-        '<div class="section">' +
-          '<h3>🎨 Generated Theme</h3>' +
-          '<div class="code-output">' + themeCode.substring(0, 300) + '...</div>' +
-          '<div class="action-buttons">' +
-            '<button class="button btn-small btn-copy" onclick="copyToClipboard(\'' + escapedThemeCode + '\')">' +
-              '📋 Copy Theme' +
-            '</button>' +
-            '<button class="button btn-small btn-download" onclick="downloadFile(\'theme.ts\', \'' + escapedThemeCode + '\')">' +
-              '💾 Download' +
-            '</button>' +
-          '</div>' +
-        '</div>';
-      
-      currentData = data;
+      updateBreadcrumb();
     }
     
-    function displayScreenResults(data) {
-      var screens = data.screens;
-      var theme = data.theme;
-      var themeCode = data.fileContent;
-      var stats = data.analysis ? data.analysis.overview : {};
+    function generateFlowCode() {
+      if (!currentState.selectedFlow) return;
       
-      var screensHTML = screens.map(function(screen, index) {
-        var escapedCode = screen.code.replace(/`/g, '\\`').replace(/\$/g, '\\$').replace(/\\/g, '\\\\');
-        return '<div class="screen-item">' +
-          '<div class="screen-header">' +
-            '<div class="screen-title">' + screen.structure.name + '</div>' +
-            '<div class="screen-badge">' + screen.structure.deviceType + '</div>' +
-          '</div>' +
-          '<div class="screen-meta">' + screen.structure.width + '×' + screen.structure.height + 'px • ' + screen.structure.components.length + ' components</div>' +
-          '<div class="code-output">' + screen.code.substring(0, 200) + '...</div>' +
-          '<div class="action-buttons">' +
-            '<button class="button btn-small btn-copy" onclick="copyToClipboard(\'' + escapedCode + '\')">' +
-              '📋 Copy Code' +
-            '</button>' +
-            '<button class="button btn-small btn-download" onclick="downloadFile(\'' + screen.structure.name + '.tsx\', \'' + escapedCode + '\')">' +
-              '💾 Download' +
-            '</button>' +
-          '</div>' +
-        '</div>';
-      }).join('');
-      
-      var escapedThemeCode = themeCode.replace(/`/g, '\\`').replace(/\$/g, '\\$');
-      
-      document.getElementById('results').innerHTML = 
-        '<div class="section">' +
-          '<h3>📱 Generated Screens</h3>' +
-          '<div class="stats">' +
-            '<div class="stat-item">' +
-              '<span class="stat-number">' + (stats.totalScreens || screens.length) + '</span>' +
-              '<div class="stat-label">Screens</div>' +
-            '</div>' +
-            '<div class="stat-item">' +
-              '<span class="stat-number">' + (stats.totalComponents || 0) + '</span>' +
-              '<div class="stat-label">Components</div>' +
-            '</div>' +
-          '</div>' +
-          screensHTML +
-        '</div>' +
-        '<div class="section">' +
-          '<h3>🎨 Complete Theme</h3>' +
-          '<div class="code-output">' + themeCode.substring(0, 300) + '...</div>' +
-          '<div class="action-buttons">' +
-            '<button class="button btn-small btn-copy" onclick="copyToClipboard(\'' + escapedThemeCode + '\')">' +
-              '📋 Copy Theme' +
-            '</button>' +
-            '<button class="button btn-small btn-download" onclick="downloadFile(\'theme.ts\', \'' + escapedThemeCode + '\')">' +
-              '💾 Download' +
-            '</button>' +
-          '</div>' +
-        '</div>';
-      
-      currentData = data;
+      showLoading('Generating React Native flow code...');
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'generate-flow-code',
+          flowId: currentState.selectedFlow.id 
+        } 
+      }, '*');
     }
     
-    function copyToClipboard(text) {
-      navigator.clipboard.writeText(text).then(function() {
-        showSuccess('✅ Copied to clipboard!');
-      }).catch(function() {
-        showError('❌ Failed to copy to clipboard');
+    function generateSelectedScreen() {
+      if (!currentState.selectedScreen || !currentState.selectedFlow) return;
+      
+      showLoading('Generating React Native screen code...');
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'generate-screen-code',
+          flowId: currentState.selectedFlow.id,
+          screenName: currentState.selectedScreen.name
+        } 
+      }, '*');
+    }
+    
+    function exportFlowTheme() {
+      if (!currentState.selectedFlow) return;
+      
+      showLoading('Generating flow-specific theme...');
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'export-flow-theme',
+          flowId: currentState.selectedFlow.id 
+        } 
+      }, '*');
+    }
+    
+    // Display functions
+    function displayFlows(flowsData) {
+      currentState.flows = flowsData.flows || [];
+      currentState.detectedRoles = flowsData.userRoles || [];
+      currentState.theme = flowsData.theme;
+      
+      const flowsContainer = document.getElementById('flowsContainer');
+      const flowsGrid = document.getElementById('flowsGrid');
+      const emptyState = document.getElementById('emptyState');
+      
+      if (currentState.flows.length === 0) {
+        flowsContainer.style.display = 'none';
+        emptyState.style.display = 'block';
+        emptyState.innerHTML = `
+          <div class="empty-state-icon">😅</div>
+          <div class="empty-state-title">No Flows Detected</div>
+          <div class="empty-state-description">
+            We couldn't detect any user flows in your design. Try using consistent naming patterns like "Customer_Onboarding_1" or organize screens in folders by user role.
+          </div>
+        `;
+        return;
+      }
+      
+      emptyState.style.display = 'none';
+      flowsContainer.style.display = 'block';
+      
+      // Update dashboard stats
+      const stats = document.getElementById('dashboardStats');
+      stats.innerHTML = `
+        <div class="stat-item">
+          <span>🎯</span>
+          <span>${currentState.flows.length} Flows</span>
+        </div>
+        <div class="stat-item">
+          <span>👥</span>
+          <span>${currentState.detectedRoles.length} User Roles</span>
+        </div>
+        <div class="stat-item">
+          <span>📱</span>
+          <span>${flowsData.analysis?.overview?.totalScreens || 0} Screens</span>
+        </div>
+      `;
+      
+      // Generate flow cards
+      flowsGrid.innerHTML = currentState.flows.map(flow => `
+        <div class="flow-card" onclick="selectFlow('${flow.id}')">
+          <div class="flow-type-indicator type-${flow.flowType}"></div>
+          <div class="flow-card-header">
+            <h3 class="flow-title">${flow.name}</h3>
+            <span class="flow-role-badge role-${flow.userRole.type}">
+              ${getRoleIcon(flow.userRole.type)} ${flow.userRole.type}
+            </span>
+          </div>
+          <div class="flow-meta">
+            <div class="flow-meta-item">
+              <span>📱</span>
+              <span>${flow.deviceTargets.join(', ')}</span>
+            </div>
+            <div class="flow-meta-item">
+              <span>🔢</span>
+              <span>${flow.screens.length} screens</span>
+            </div>
+            <div class="flow-meta-item">
+              <span>⏱️</span>
+              <span>~${flow.estimatedDuration || 5} min</span>
+            </div>
+          </div>
+          <div class="flow-description">
+            ${getFlowDescription(flow.flowType, flow.userRole.type)}
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    function showFlowDetail(flow) {
+      const header = document.getElementById('flowDetailHeader');
+      const screensGrid = document.getElementById('screensGrid');
+      const screenCount = document.getElementById('screenCount');
+      
+      // Update flow header
+      header.innerHTML = `
+        <h2 class="flow-detail-title">${flow.name}</h2>
+        <div class="flow-detail-meta">
+          <div class="flow-meta-item">
+            <span>👤</span>
+            <span>${flow.userRole.name} Role</span>
+          </div>
+          <div class="flow-meta-item">
+            <span>🎯</span>
+            <span>${flow.flowType.replace('_', ' ')}</span>
+          </div>
+          <div class="flow-meta-item">
+            <span>📱</span>
+            <span>${flow.deviceTargets.join(', ')}</span>
+          </div>
+          <div class="flow-meta-item">
+            <span>🚀</span>
+            <span>${flow.navigationPattern} navigation</span>
+          </div>
+        </div>
+      `;
+      
+      // Update screen count
+      screenCount.textContent = `${flow.screens.length} screens`;
+      
+      // Generate screen cards
+      screensGrid.innerHTML = flow.screens.map((screen, index) => `
+        <div class="screen-card" data-screen="${screen.name}" onclick="selectScreen('${screen.name}')">
+          <div class="screen-preview">
+            <div class="screen-device-indicator">${getDeviceIcon(screen.deviceType)}</div>
+            <span>Screen Preview</span>
+          </div>
+          <div class="screen-info">
+            <h4 class="screen-name">${screen.name}</h4>
+            <div class="screen-meta">
+              <span>${screen.width}×${screen.height}</span>
+              <span>${screen.components?.length || 0} components</span>
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+    
+    function showCodeModal(title, code, filename = 'code.tsx') {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('codePreview').textContent = code;
+      document.getElementById('codeModal').style.display = 'flex';
+      currentState.generatedCode = code;
+      currentState.currentFilename = filename;
+    }
+    
+    function closeCodeModal() {
+      document.getElementById('codeModal').style.display = 'none';
+    }
+    
+    function copyCode() {
+      navigator.clipboard.writeText(currentState.generatedCode).then(() => {
+        showSuccess('✅ Code copied to clipboard!');
+      }).catch(() => {
+        showError('❌ Failed to copy code');
       });
     }
     
-    function downloadFile(filename, content) {
+    function downloadCode() {
       try {
-        var blob = new Blob([content], { type: 'text/plain' });
-        var url = window.URL.createObjectURL(blob);
-        var a = document.createElement('a');
+        const blob = new Blob([currentState.generatedCode], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
         a.href = url;
-        a.download = filename;
+        a.download = currentState.currentFilename || 'generated-code.tsx';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-        showSuccess('✅ Downloaded ' + filename);
+        showSuccess(`✅ Downloaded ${currentState.currentFilename}`);
       } catch (error) {
         showError('❌ Failed to download file');
       }
     }
     
-    // Handle messages from plugin
+    // Helper functions
+    function getRoleIcon(roleType) {
+      const icons = {
+        customer: '👤',
+        admin: '🔧',
+        operator: '⚙️',
+        guest: '👋',
+        moderator: '🛡️'
+      };
+      return icons[roleType] || '👤';
+    }
+    
+    function getDeviceIcon(deviceType) {
+      const icons = {
+        mobile: '📱',
+        tablet: '📱',
+        desktop: '💻'
+      };
+      return icons[deviceType] || '📱';
+    }
+    
+    function getFlowDescription(flowType, roleType) {
+      const descriptions = {
+        onboarding: 'Guide users through initial setup and introduction',
+        authentication: 'Handle user login, signup, and account verification',
+        main_feature: 'Core functionality and primary user interactions',
+        settings: 'User preferences and configuration options',
+        checkout: 'Purchase flow and payment processing',
+        unknown: 'Custom user journey and interactions'
+      };
+      return descriptions[flowType] || 'User journey and task completion';
+    }
+    
+    function showError(message) {
+      const errorDiv = document.getElementById('errorMessage');
+      errorDiv.textContent = message;
+      errorDiv.style.display = 'block';
+      setTimeout(() => {
+        errorDiv.style.display = 'none';
+      }, 5000);
+    }
+    
+    function showSuccess(message) {
+      const successDiv = document.getElementById('successMessage');
+      successDiv.textContent = message;
+      successDiv.style.display = 'block';
+      setTimeout(() => {
+        successDiv.style.display = 'none';
+      }, 3000);
+    }
+    
+    // Message handling from plugin
     onmessage = function(event) {
-      var msg = event.data.pluginMessage;
+      const msg = event.data.pluginMessage;
       
       switch (msg.type) {
         case 'progress':
           updateProgress(msg.progress, msg.message);
           break;
           
+        case 'flows-detected':
+          hideLoading();
+          showView('dashboard');
+          displayFlows(msg.data);
+          showSuccess('🎉 Flows detected successfully!');
+          break;
+          
         case 'tokens-extracted':
         case 'extraction-complete':
           hideLoading();
-          document.getElementById('results').style.display = 'block';
-          displayTokenResults(msg.data);
-          showSuccess('🎉 Design tokens extracted successfully!');
+          showCodeModal('Design Tokens & Theme', msg.data.fileContent, 'theme.ts');
+          showSuccess('🎉 Design tokens extracted!');
           break;
           
-        case 'screens-extracted':
+        case 'flow-code-generated':
           hideLoading();
-          document.getElementById('results').style.display = 'block';
-          displayScreenResults(msg.data);
-          showSuccess('🎉 React Native screens generated successfully!');
+          showView('flow-detail');
+          showCodeModal('React Native Flow Code', msg.data.code, `${currentState.selectedFlow?.name || 'Flow'}.tsx`);
+          showSuccess('🎉 Flow code generated!');
+          break;
+          
+        case 'screen-code-generated':
+          hideLoading();
+          showView('flow-detail');
+          showCodeModal('React Native Screen Code', msg.data.code, `${currentState.selectedScreen?.name || 'Screen'}.tsx`);
+          showSuccess('🎉 Screen code generated!');
+          break;
+          
+        case 'flow-theme-exported':
+          hideLoading();
+          showCodeModal('Flow Theme', msg.data.themeContent, 'flow-theme.ts');
+          showSuccess('🎉 Flow theme exported!');
           break;
           
         case 'error':
           hideLoading();
-          showError(msg.message || msg.error);
+          showView(currentState.view === 'loading' ? 'dashboard' : currentState.view);
+          showError(msg.error?.message || msg.error || 'An error occurred');
           break;
       }
     };

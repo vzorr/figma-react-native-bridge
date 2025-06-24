@@ -223,3 +223,96 @@ export type PluginMessage = ProgressUpdate | ErrorMessage | SuccessMessage;
 export type SafeNumber = number;
 export type SafeString = string;
 export type NodeProperty<T> = T | symbol | undefined;
+
+// User role detection from layer naming
+export interface UserRole {
+  id: string;
+  name: string;
+  type: 'customer' | 'admin' | 'operator' | 'guest' | 'moderator' | 'unknown';
+  confidence: number;
+  detectionSource: 'layer_name' | 'folder_structure' | 'content_analysis';
+  permissions?: string[];
+}
+
+// Flow detection and organization
+export interface FlowStructure {
+  id: string;
+  name: string;
+  userRole: UserRole;
+  screens: ScreenStructure[];
+  flowType: 'onboarding' | 'main_feature' | 'settings' | 'authentication' | 'checkout' | 'unknown';
+  navigationPattern: 'stack' | 'tab' | 'modal' | 'drawer' | 'mixed';
+  deviceTargets: ('mobile' | 'tablet' | 'desktop')[];
+  sequence: number;
+  parentFlow?: string;
+  subFlows?: string[];
+  estimatedDuration?: number; // minutes to complete flow
+}
+
+// Enhanced screen structure with flow context
+export interface FlowAwareScreen extends ScreenStructure {
+  flowId: string;
+  userRole: UserRole;
+  sequenceInFlow: number;
+  navigationTo?: string[]; // IDs of screens this can navigate to
+  navigationFrom?: string[]; // IDs of screens that can navigate here
+  flowStage: 'entry' | 'middle' | 'exit' | 'standalone';
+  userIntent: string; // what user is trying to accomplish
+  criticalPath: boolean; // is this screen on the critical user path
+}
+
+// Layer analysis for role and flow detection
+export interface LayerAnalysis {
+  layerName: string;
+  parentLayers: string[];
+  depth: number;
+  detectedRole?: UserRole;
+  detectedFlow?: string;
+  namingPatterns: {
+    hasRolePrefix: boolean;
+    hasFlowIndicator: boolean;
+    hasSequenceNumber: boolean;
+    hasDeviceIndicator: boolean;
+  };
+  confidence: number;
+}
+
+// Flow detection results
+export interface FlowDetectionResult {
+  flows: FlowStructure[];
+  orphanedScreens: ScreenStructure[]; // screens that don't fit into any flow
+  roleDistribution: Record<string, number>;
+  flowTypeDistribution: Record<string, number>;
+  detectionQuality: {
+    totalScreens: number;
+    screensInFlows: number;
+    averageFlowLength: number;
+    roleDetectionAccuracy: number;
+  };
+  recommendations: string[];
+}
+
+// Role-specific design patterns
+export interface RoleBasedDesignPattern {
+  role: UserRole;
+  commonComponents: string[];
+  colorPalette: string[];
+  typographyStyle: 'formal' | 'friendly' | 'technical' | 'minimal';
+  navigationComplexity: 'simple' | 'moderate' | 'complex';
+  informationDensity: 'low' | 'medium' | 'high';
+  interactionPatterns: string[];
+}
+
+// Enhanced extraction results with flow context
+export interface FlowAwareExtractionResult extends ExtractionResult {
+  flows: FlowStructure[];
+  userRoles: UserRole[];
+  roleBasedPatterns: RoleBasedDesignPattern[];
+  flowDetection: FlowDetectionResult;
+  crossFlowConsistency: {
+    sharedComponents: number;
+    consistentStyling: number;
+    navigationPatterns: number;
+    overallScore: number;
+  };
+}
