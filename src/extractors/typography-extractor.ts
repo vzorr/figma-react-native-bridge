@@ -22,13 +22,6 @@ export interface TypographyData {
   }>;
 }
 
-export interface TextHierarchy {
-  headings: Array<any>;
-  body: Array<any>;
-  captions: Array<any>;
-  buttons: Array<any>;
-}
-
 export class TypographyExtractor {
 
   @LogFunction(MODULE_NAME)
@@ -164,27 +157,23 @@ export class TypographyExtractor {
 
     logger.info(MODULE_NAME, 'extractAllTypography', `Processing ${nodes.length} nodes for typography`);
 
-    const processNodes = (nodeList: any[]): void => {
-      nodeList.forEach((node: any, index: number) => {
-        try {
-          if (node && node.visible !== false) {
-            this.extractFromNode(node, typography);
-            
-            // Also check children for nested text
-            if (node.children && Array.isArray(node.children)) {
-              processNodes(node.children);
-            }
+    nodes.forEach((node: any, index: number) => {
+      try {
+        if (node && node.visible !== false) {
+          this.extractFromNode(node, typography);
+          
+          // Also check children for nested text
+          if (node.children && Array.isArray(node.children)) {
+            this.extractAllTypography(node.children);
           }
-        } catch (nodeError) {
-          logger.warn(MODULE_NAME, 'extractAllTypography', `Error processing node ${index}:`, { 
-            error: nodeError,
-            node: node?.name || 'unnamed'
-          });
         }
-      });
-    };
-
-    processNodes(nodes);
+      } catch (nodeError) {
+        logger.warn(MODULE_NAME, 'extractAllTypography', `Error processing node ${index}:`, { 
+          error: nodeError,
+          node: node?.name || 'unnamed'
+        });
+      }
+    });
 
     logger.info(MODULE_NAME, 'extractAllTypography', 'Typography extraction complete', {
       fontSizes: typography.fontSizes.size,
@@ -198,11 +187,11 @@ export class TypographyExtractor {
 
   @LogFunction(MODULE_NAME)
   generateTypographyScale(fontSizes: Set<number>): Record<string, number> {
-    const sizes = Array.from(fontSizes).sort((a, b) => a - b);
+    const sizes = Array.from(fontSizes).sort((a: number, b: number) => a - b);
     const scale: Record<string, number> = {};
 
     // Map to semantic scale names
-    sizes.forEach((size: number) => {
+    sizes.forEach((size: number, index: number) => {
       if (size <= 12) scale.xs = size;
       else if (size <= 14) scale.sm = size;
       else if (size <= 16) scale.base = size;
@@ -230,6 +219,8 @@ export class TypographyExtractor {
     const normalizedWeights = Array.from(fontWeights).map(w => this.normalizeFontWeight(w));
     
     // Standard weights in order
+    const standardWeights = ['300', '400', '500', '600', '700'];
+    
     normalizedWeights.forEach(weight => {
       if (weight === '300') weights.light = weight;
       else if (weight === '400') weights.normal = weight;
@@ -247,7 +238,7 @@ export class TypographyExtractor {
   }
 
   private normalizeFontWeight(weight: string): string {
-    // Handle Figma font weight names with proper type assertion
+    // Handle Figma font weight names
     const mapping = FONT_WEIGHT_MAPPINGS as Record<string, string>;
     return mapping[weight] || weight || '400';
   }
@@ -263,7 +254,7 @@ export class TypographyExtractor {
     }
   }
 
-  private extractLineHeight(node: any): number | undefined {
+  private extractLineHeight(node: any): number | null {
     try {
       if (node.lineHeight && typeof node.lineHeight === 'object') {
         if (node.lineHeight.unit === 'PIXELS' && isValidNumber(node.lineHeight.value)) {
@@ -274,22 +265,22 @@ export class TypographyExtractor {
           return Math.round(fontSize * (node.lineHeight.value / 100));
         }
       }
-      return undefined;
+      return null;
     } catch (error) {
-      return undefined;
+      return null;
     }
   }
 
-  private extractLetterSpacing(node: any): number | undefined {
+  private extractLetterSpacing(node: any): number | null {
     try {
       if (node.letterSpacing && typeof node.letterSpacing === 'object') {
         if (isValidNumber(node.letterSpacing.value)) {
           return safeGetNumber(node.letterSpacing.value);
         }
       }
-      return undefined;
+      return null;
     } catch (error) {
-      return undefined;
+      return null;
     }
   }
 
@@ -314,8 +305,13 @@ export class TypographyExtractor {
   }
 
   @LogFunction(MODULE_NAME)
-  analyzeTextHierarchy(textStyles: Array<any>): TextHierarchy {
-    const hierarchy: TextHierarchy = {
+  analyzeTextHierarchy(textStyles: Array<any>): {
+    headings: Array<any>;
+    body: Array<any>;
+    captions: Array<any>;
+    buttons: Array<any>;
+  } {
+    const hierarchy = {
       headings: [] as Array<any>,
       body: [] as Array<any>,
       captions: [] as Array<any>,
@@ -341,7 +337,7 @@ export class TypographyExtractor {
 
     // Sort by font size within each category
     Object.values(hierarchy).forEach(category => {
-      category.sort((a, b) => b.fontSize - a.fontSize);
+      category.sort((a: any, b: any) => b.fontSize - a.fontSize);
     });
 
     logger.debug(MODULE_NAME, 'analyzeTextHierarchy', 'Text hierarchy analysis complete', {
@@ -352,121 +348,6 @@ export class TypographyExtractor {
     });
 
     return hierarchy;
-  }
-
-  @LogFunction(MODULE_NAME)
-  generateSemanticTypography(typography: TypographyData): {
-    scale: Record<string, number>;
-    weights: Record<string, string>;
-    families: string[];
-    hierarchy: TextHierarchy;
-  } {
-    const FUNC_NAME = 'generateSemanticTypography';
-    
-    try {
-      const scale = this.generateTypographyScale(typography.fontSizes);
-      const weights = this.optimizeFontWeights(typography.fontWeights);
-      const families = Array.from(typography.fontFamilies);
-      const hierarchy = this.analyzeTextHierarchy(typography.textStyles);
-
-      const result = {
-        scale,
-        weights,
-        families,
-        hierarchy
-      };
-
-      logger.info(MODULE_NAME, FUNC_NAME, 'Generated semantic typography system', {
-        scaleCount: Object.keys(scale).length,
-        weightsCount: Object.keys(weights).length,
-        familiesCount: families.length,
-        stylesCount: typography.textStyles.length
-      });
-
-      return result;
-    } catch (error) {
-      logger.error(MODULE_NAME, FUNC_NAME, 'Error generating semantic typography:', error as Error);
-      return {
-        scale: { base: 16 },
-        weights: { normal: '400' },
-        families: ['System'],
-        hierarchy: {
-          headings: [],
-          body: [],
-          captions: [],
-          buttons: []
-        }
-      };
-    }
-  }
-
-  @LogFunction(MODULE_NAME)
-  validateTypographyConsistency(typography: TypographyData): {
-    score: number;
-    issues: string[];
-    recommendations: string[];
-  } {
-    const FUNC_NAME = 'validateTypographyConsistency';
-    const issues: string[] = [];
-    const recommendations: string[] = [];
-    
-    try {
-      // Check font size scale consistency
-      const fontSizes = Array.from(typography.fontSizes).sort((a, b) => a - b);
-      if (fontSizes.length > 8) {
-        issues.push('Too many unique font sizes detected');
-        recommendations.push('Consider consolidating to a modular type scale');
-      }
-
-      // Check for common modular scale ratios
-      let scaleConsistent = true;
-      for (let i = 1; i < fontSizes.length; i++) {
-        const ratio = fontSizes[i] / fontSizes[i - 1];
-        if (ratio < 1.1 || ratio > 1.6) {
-          scaleConsistent = false;
-          break;
-        }
-      }
-
-      if (!scaleConsistent && fontSizes.length > 3) {
-        issues.push('Font sizes do not follow a consistent modular scale');
-        recommendations.push('Use a consistent type scale (1.125, 1.2, 1.25, 1.333, etc.)');
-      }
-
-      // Check font weight consistency
-      const weights = Array.from(typography.fontWeights);
-      if (weights.length > 6) {
-        issues.push('Too many font weights in use');
-        recommendations.push('Limit to 3-4 font weights maximum');
-      }
-
-      // Check font family consistency
-      const families = Array.from(typography.fontFamilies);
-      if (families.length > 3) {
-        issues.push('Too many font families in use');
-        recommendations.push('Limit to 1-2 font families for consistency');
-      }
-
-      // Calculate overall consistency score
-      const maxIssues = 4;
-      const score = Math.max(0, (maxIssues - issues.length) / maxIssues * 100);
-
-      const result = {
-        score: Math.round(score),
-        issues,
-        recommendations
-      };
-
-      logger.debug(MODULE_NAME, FUNC_NAME, 'Typography consistency analysis complete', result);
-      return result;
-    } catch (error) {
-      logger.error(MODULE_NAME, FUNC_NAME, 'Error validating typography consistency:', error as Error);
-      return {
-        score: 0,
-        issues: ['Error analyzing typography consistency'],
-        recommendations: ['Review typography usage manually']
-      };
-    }
   }
 }
 

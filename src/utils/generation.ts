@@ -1,16 +1,95 @@
 // src/utils/generation.ts
 // Code generation utilities (ES2017 compatible - no Object.fromEntries)
 
-import '../global'; // Import global types
-import type { ExtractedValues, ComponentData, ScreenStructure } from '../types/plugin.types';
-import { 
-  getSemanticColorName, 
-  mapFigmaFontWeight, 
-  getReactNativeComponent, 
-  sanitizeName, 
-  generateComponentProps,
-  generateUniqueId 
-} from './helpers';
+import { ExtractedValues, ComponentData, ScreenStructure } from '@core/types';
+import { sanitizeName } from '@utils/figma-helpers';
+
+// Helper functions for code generation
+export function getSemanticColorName(color: string): string | null {
+  const colorMappings: Record<string, string> = {
+    '#FFFFFF': 'white',
+    '#000000': 'black',
+    '#FF0000': 'red',
+    '#00FF00': 'green',
+    '#0000FF': 'blue',
+    '#FFC107': 'warning',
+    '#28A745': 'success',
+    '#DC3545': 'danger',
+    '#007BFF': 'primary',
+    '#6C757D': 'secondary',
+    '#F8F9FA': 'light',
+    '#343A40': 'dark'
+  };
+  
+  return colorMappings[color.toUpperCase()] || null;
+}
+
+export function mapFigmaFontWeight(weight: string): string {
+  const mappings: Record<string, string> = {
+    'Thin': '100',
+    'Extra Light': '200',
+    'Light': '300',
+    'Normal': '400',
+    'Regular': '400',
+    'Medium': '500',
+    'Semi Bold': '600',
+    'SemiBold': '600',
+    'Bold': '700',
+    'Extra Bold': '800',
+    'Black': '900',
+    'Heavy': '900'
+  };
+  
+  return mappings[weight] || '400';
+}
+
+export function getReactNativeComponent(component: ComponentData): string {
+  const type = component.type?.toLowerCase();
+  
+  switch (type) {
+    case 'button':
+      return 'TouchableOpacity';
+    case 'input':
+      return 'TextInput';
+    case 'text':
+    case 'heading':
+    case 'label':
+      return 'Text';
+    case 'image':
+      return 'Image';
+    case 'scroll':
+      return 'ScrollView';
+    default:
+      return 'View';
+  }
+}
+
+export function generateComponentProps(component: ComponentData): string {
+  const props: string[] = [];
+  
+  if (component.width && component.height) {
+    props.push(`style={styles.${sanitizeName(component.name)}}`);
+  }
+  
+  if (component.placeholder && component.type === 'input') {
+    props.push(`placeholder="${component.placeholder}"`);
+  }
+  
+  return props.length > 0 ? ` ${props.join(' ')}` : '';
+}
+
+export function generateUniqueId(baseName: string, existingIds: Set<string>): string {
+  let id = sanitizeName(baseName);
+  let counter = 1;
+  
+  while (existingIds.has(id)) {
+    id = `${sanitizeName(baseName)}${counter}`;
+    counter++;
+  }
+  
+  existingIds.add(id);
+  return id;
+}
 
 // Generated theme interface
 export interface GeneratedTheme {
@@ -236,7 +315,7 @@ export function generateReactNativeScreen(screenStructure: ScreenStructure, them
     
     if (component.children && component.children.length > 0) {
       jsx += '>\n';
-      jsx += component.children.map(child => generateComponentJSX(child, depth + 1)).join('\n');
+      jsx += component.children.map((child: ComponentData) => generateComponentJSX(child, depth + 1)).join('\n');
       jsx += `\n${indent}</${componentType}>`;
     } else if (component.text) {
       jsx += `>\n${indent}  {/* ${component.text} */}\n${indent}</${componentType}>`;
@@ -248,7 +327,7 @@ export function generateReactNativeScreen(screenStructure: ScreenStructure, them
   }
 
   const componentsJSX = screenStructure.components
-    .map(component => generateComponentJSX(component))
+    .map((component: ComponentData) => generateComponentJSX(component))
     .join('\n');
 
   return `// ${componentName}.tsx - Generated from Figma
