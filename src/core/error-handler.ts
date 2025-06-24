@@ -1,5 +1,5 @@
 // src/core/error-handler.ts
-// Centralized error handling with detailed logging and recovery strategies
+// Symbol-safe error handling with proper serialization
 
 import { logger, LogLevel } from './logger';
 
@@ -39,7 +39,57 @@ export class ErrorHandler {
   private static maxHistorySize = 100;
 
   /**
-   * Main error handling method
+   * Safe serialization that removes Symbols and other non-serializable values
+   */
+  private static safeSerialize(obj: any): any {
+    if (obj === null || obj === undefined) {
+      return obj;
+    }
+
+    if (typeof obj === 'symbol') {
+      return '[Symbol]';
+    }
+
+    if (typeof obj === 'function') {
+      return '[Function]';
+    }
+
+    if (typeof obj === 'bigint') {
+      return obj.toString();
+    }
+
+    if (obj instanceof Error) {
+      return {
+        name: obj.name,
+        message: obj.message,
+        stack: obj.stack
+      };
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map(item => this.safeSerialize(item));
+    }
+
+    if (typeof obj === 'object') {
+      const result: any = {};
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          try {
+            const value = obj[key];
+            result[key] = this.safeSerialize(value);
+          } catch (error) {
+            result[key] = '[Unserializable]';
+          }
+        }
+      }
+      return result;
+    }
+
+    return obj;
+  }
+
+  /**
+   * Main error handling method with safe serialization
    */
   static handle(
     error: Error,
@@ -51,17 +101,20 @@ export class ErrorHandler {
     const FUNC_NAME = 'handle';
     
     try {
-      // Normalize context
+      // Normalize context with safe serialization
       const errorContext: ErrorContext = typeof context === 'string' 
         ? {
             module: module || 'Unknown',
             function: func || 'unknown',
             operation: context,
-            additionalData
+            additionalData: this.safeSerialize(additionalData)
           }
-        : context;
+        : {
+            ...context,
+            additionalData: this.safeSerialize(context.additionalData)
+          };
 
-      // Generate error report
+      // Generate error report with safe serialization
       const report = this.generateErrorReport(error, errorContext);
       
       // Log the error
@@ -81,7 +134,7 @@ export class ErrorHandler {
       // Store in history
       this.addToHistory(report);
 
-      // Send to UI if possible
+      // Send to UI with safe serialization
       this.sendToUI(report);
 
       // Apply recovery strategy
@@ -93,19 +146,22 @@ export class ErrorHandler {
       return report.id;
 
     } catch (handlingError) {
-      // Fallback error handling
+      // Fallback error handling with minimal serialization
       console.error('Error in error handler:', handlingError);
       console.error('Original error:', error);
       
       try {
-        figma.ui.postMessage({
+        // Send minimal safe error message
+        const safeErrorMessage = {
           type: 'critical-error',
           error: {
             message: 'Error handler failed',
-            originalError: error.message,
+            originalError: typeof error === 'object' && error.message ? error.message : String(error),
             timestamp: Date.now()
           }
-        });
+        };
+
+        figma.ui.postMessage(safeErrorMessage);
       } catch (uiError) {
         console.error('Cannot send error to UI:', uiError);
       }
@@ -115,7 +171,7 @@ export class ErrorHandler {
   }
 
   /**
-   * Generate detailed error report
+   * Generate detailed error report with safe serialization
    */
   private static generateErrorReport(error: Error, context: ErrorContext): ErrorReport {
     const errorId = `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -129,11 +185,11 @@ export class ErrorHandler {
       id: errorId,
       timestamp: Date.now(),
       error: {
-        name: error.name,
-        message: error.message,
+        name: error.name || 'Error',
+        message: error.message || 'Unknown error',
         stack: error.stack,
       },
-      context,
+      context: this.safeSerialize(context),
       severity,
       recoverable,
       userImpact,
@@ -142,12 +198,96 @@ export class ErrorHandler {
   }
 
   /**
+   * Send error report to UI with safe serialization
+   */
+  private static sendToUI(report: ErrorReport): void {
+    try {
+      // Create a safe, minimal version of the error report for UI
+      const safeReport = {
+        id: report.id,
+        timestamp: report.timestamp,
+        message: report.error.message,
+        severity: report.severity,
+        recoverable: report.recoverable,
+        userImpact: report.userImpact,
+        suggestedAction: report.suggestedAction,
+        context: {
+          module: report.context.module,
+          operation: report.context.operation,
+        }
+      };
+
+      const message = {
+        type: 'error-report',
+        report: safeReport
+      };
+
+      figma.ui.postMessage(message);
+    } catch (uiError) {
+      // If even the safe version fails, log to console only
+      console.warn('Failed to send error to UI:', {
+        errorId: report.id,
+        message: report.error.message,
+        uiError: uiError
+      });
+    }
+  }
+
+  /**
+   * Attempt error recovery based on context
+   */
+  private static attemptRecovery(report: ErrorReport): void {
+    if (!report.recoverable) {
+      return;
+    }
+
+    const context = report.context;
+
+    try {
+      // Recovery strategies based on operation type
+      if (context.operation.includes('extraction') && 
+          report.error.message.includes('Symbol')) {
+        
+        // For Symbol conversion errors, send a message to continue with next item
+        const recoveryMessage = {
+          type: 'recovery-action',
+          action: 'skip-current-node',
+          reason: 'Symbol conversion error',
+          errorId: report.id
+        };
+
+        figma.ui.postMessage(recoveryMessage);
+      }
+
+      if (context.operation.includes('generation') && 
+          report.error.name === 'TypeError') {
+        
+        // For generation errors, try with fallback values
+        const recoveryMessage = {
+          type: 'recovery-action',
+          action: 'use-fallback-values',
+          reason: 'Type error in generation',
+          errorId: report.id
+        };
+
+        figma.ui.postMessage(recoveryMessage);
+      }
+
+    } catch (recoveryError) {
+      console.warn('Recovery attempt failed:', {
+        originalError: report.id,
+        recoveryError: recoveryError
+      });
+    }
+  }
+
+  /**
    * Determine error severity based on context and error type
    */
   private static determineSeverity(error: Error, context: ErrorContext): 'low' | 'medium' | 'high' | 'critical' {
     // Critical errors
     if (error.name === 'TypeError' && error.message.includes('Cannot convert a Symbol')) {
-      return 'high'; // Symbol conversion errors are serious but recoverable
+      return 'medium'; // Symbol conversion errors are medium but recoverable
     }
     
     if (context.operation.includes('initialization') || context.operation.includes('plugin')) {
@@ -189,7 +329,8 @@ export class ErrorHandler {
     }
 
     // Symbol conversion errors are recoverable (skip the node)
-    if (error.message.includes('Cannot convert a Symbol')) {
+    if (error.message.includes('Cannot convert a Symbol') || 
+        error.message.includes('Cannot unwrap symbol')) {
       return true;
     }
 
@@ -202,7 +343,7 @@ export class ErrorHandler {
    */
   private static determineUserImpact(error: Error, context: ErrorContext): string {
     if (context.operation.includes('extraction')) {
-      if (error.message.includes('Symbol')) {
+      if (error.message.includes('Symbol') || error.message.includes('symbol')) {
         return 'Some design elements may be skipped during extraction';
       }
       return 'Design extraction may fail or produce incomplete results';
@@ -223,7 +364,8 @@ export class ErrorHandler {
    * Suggest action to user
    */
   private static suggestAction(error: Error, context: ErrorContext): string {
-    if (error.message.includes('Cannot convert a Symbol')) {
+    if (error.message.includes('Cannot convert a Symbol') || 
+        error.message.includes('Cannot unwrap symbol')) {
       return 'This is a known issue with certain Figma elements. The plugin will skip problematic elements and continue.';
     }
 
@@ -254,76 +396,6 @@ export class ErrorHandler {
   }
 
   /**
-   * Send error report to UI
-   */
-  private static sendToUI(report: ErrorReport): void {
-    try {
-      figma.ui.postMessage({
-        type: 'error-report',
-        report: {
-          id: report.id,
-          timestamp: report.timestamp,
-          message: report.error.message,
-          severity: report.severity,
-          recoverable: report.recoverable,
-          userImpact: report.userImpact,
-          suggestedAction: report.suggestedAction,
-          context: {
-            module: report.context.module,
-            operation: report.context.operation,
-          }
-        }
-      });
-    } catch (uiError) {
-      logger.warn(MODULE_NAME, 'sendToUI', 'Failed to send error to UI:', { error: uiError });
-    }
-  }
-
-  /**
-   * Attempt error recovery based on context
-   */
-  private static attemptRecovery(report: ErrorReport): void {
-    if (!report.recoverable) {
-      return;
-    }
-
-    const context = report.context;
-
-    try {
-      // Recovery strategies based on operation type
-      if (context.operation.includes('extraction') && 
-          report.error.message.includes('Symbol')) {
-        
-        // For Symbol conversion errors, send a message to continue with next item
-        figma.ui.postMessage({
-          type: 'recovery-action',
-          action: 'skip-current-node',
-          reason: 'Symbol conversion error',
-          errorId: report.id
-        });
-      }
-
-      if (context.operation.includes('generation') && 
-          report.error.name === 'TypeError') {
-        
-        // For generation errors, try with fallback values
-        figma.ui.postMessage({
-          type: 'recovery-action',
-          action: 'use-fallback-values',
-          reason: 'Type error in generation',
-          errorId: report.id
-        });
-      }
-
-    } catch (recoveryError) {
-      logger.warn(MODULE_NAME, 'attemptRecovery', 'Recovery attempt failed:', { 
-        originalError: report.id,
-        recoveryError 
-      });
-    }
-  }
-
-  /**
    * Create a safe wrapper for functions that might throw
    */
   static createSafeWrapper<T extends (...args: any[]) => any>(
@@ -339,7 +411,7 @@ export class ErrorHandler {
           module: context.module || 'Unknown',
           function: context.function || 'wrapped',
           operation: context.operation || 'wrapped function call',
-          additionalData: { args }
+          additionalData: this.safeSerialize({ args })
         });
         return fallback;
       }
@@ -362,7 +434,7 @@ export class ErrorHandler {
           module: context.module || 'Unknown',
           function: context.function || 'wrappedAsync',
           operation: context.operation || 'wrapped async function call',
-          additionalData: { args }
+          additionalData: this.safeSerialize({ args })
         });
         return fallback;
       }
@@ -370,7 +442,7 @@ export class ErrorHandler {
   }
 
   /**
-   * Get error statistics
+   * Get error statistics with safe serialization
    */
   static getStatistics(): {
     totalErrors: number;
@@ -402,14 +474,24 @@ export class ErrorHandler {
   }
 
   /**
-   * Export error history for debugging
+   * Export error history for debugging with safe serialization
    */
   static exportErrorHistory(): string {
-    return JSON.stringify({
-      exportTime: new Date().toISOString(),
-      statistics: this.getStatistics(),
-      errors: this.errorHistory
-    }, null, 2);
+    try {
+      const safeHistory = this.safeSerialize({
+        exportTime: new Date().toISOString(),
+        statistics: this.getStatistics(),
+        errors: this.errorHistory
+      });
+
+      return JSON.stringify(safeHistory, null, 2);
+    } catch (error) {
+      return JSON.stringify({
+        exportTime: new Date().toISOString(),
+        error: 'Failed to serialize error history',
+        message: error instanceof Error ? error.message : String(error)
+      }, null, 2);
+    }
   }
 
   /**
