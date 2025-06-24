@@ -1,0 +1,132 @@
+{
+  "name": "figma-react-native-bridge",
+  "version": "1.0.0",
+  "description": "Extract design tokens and generate React Native components from Figma designs",
+  "main": "dist/code.js",
+  "author": "Your Name",
+  "license": "MIT",
+  "keywords": [
+    "figma",
+    "react-native",
+    "design-tokens",
+    "design-system",
+    "plugin"
+  ],
+  "scripts": {
+    "dev": "webpack --mode development --watch --stats=minimal",
+    "build": "npm run clean && webpack --mode production",
+    "build:dev": "webpack --mode development",
+    "clean": "rimraf dist",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src/**/*.ts --fix",
+    "lint:check": "eslint src/**/*.ts",
+    "type-check": "tsc --noEmit",
+    "validate": "npm run lint:check && npm run type-check && npm run test",
+    "analyze": "webpack-bundle-analyzer dist/code.js --mode static",
+    "analyze:json": "webpack --mode production --profile --json > stats.json",
+    "prepare-release": "npm run validate && npm run build",
+    "docs": "typedoc src --out docs --exclude '**/*.test.ts'",
+    "module-map": "node build/build-scripts/generate-module-map.js",
+    "dependency-graph": "madge --image dependency-graph.svg src/main.ts",
+    "size-check": "size-limit",
+    "pre-commit": "lint-staged"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/figma": "^1.0.4",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.15.0",
+    "@typescript-eslint/eslint-plugin": "^5.57.0",
+    "@typescript-eslint/parser": "^5.57.0",
+    "eslint": "^8.37.0",
+    "eslint-config-prettier": "^8.8.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "husky": "^8.0.3",
+    "jest": "^29.5.0",
+    "lint-staged": "^13.2.0",
+    "madge": "^6.0.0",
+    "prettier": "^2.8.7",
+    "rimraf": "^4.4.1",
+    "size-limit": "^8.2.4",
+    "ts-jest": "^29.1.0",
+    "ts-loader": "^9.4.2",
+    "typedoc": "^0.24.1",
+    "typescript": "^5.0.2",
+    "webpack": "^5.76.0",
+    "webpack-bundle-analyzer": "^4.8.0",
+    "webpack-cli": "^5.0.1"
+  },
+  "lint-staged": {
+    "*.{ts,js}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  },
+  "size-limit": [
+    {
+      "path": "dist/code.js",
+      "limit": "500 KB",
+      "gzip": false
+    }
+  ],
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/src"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.ts",
+      "**/?(*.)+(spec|test).ts"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.test.ts",
+      "!src/**/*.spec.ts",
+      "!src/**/index.ts"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 70,
+        "functions": 70,
+        "lines": 70,
+        "statements": 70
+      }
+    },
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.ts"
+    ],
+    "moduleNameMapping": {
+      "^@core/(.*)$": "<rootDir>/src/core/$1",
+      "^@extractors/(.*)$": "<rootDir>/src/extractors/$1",
+      "^@generators/(.*)$": "<rootDir>/src/generators/$1",
+      "^@detectors/(.*)$": "<rootDir>/src/detectors/$1",
+      "^@utils/(.*)$": "<rootDir>/src/utils/$1",
+      "^@handlers/(.*)$": "<rootDir>/src/handlers/$1",
+      "^@types/(.*)$": "<rootDir>/src/types/$1"
+    }
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/figma-react-native-bridge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/figma-react-native-bridge/issues"
+  },
+  "homepage": "https://github.com/your-username/figma-react-native-bridge#readme",
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "package.json"
+  ]
+}

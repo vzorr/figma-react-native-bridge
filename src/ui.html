@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Figma to RN Design Bridge</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    
+    body { 
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px; 
+      margin: 0;
+      background: #f8f9fa;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    
+    .container { 
+      max-width: 100%; 
+    }
+    
+    .button { 
+      background: #0066cc; 
+      color: white; 
+      border: none; 
+      padding: 12px 24px; 
+      border-radius: 6px; 
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      margin: 8px 0;
+      width: 100%;
+      transition: background-color 0.2s ease;
+    }
+    
+    .button:hover { 
+      background: #0052a3; 
+    }
+    
+    .button:active {
+      background: #004085;
+    }
+    
+    .button:disabled {
+      background: #6c757d;
+      cursor: not-allowed;
+    }
+    
+    .section { 
+      margin: 16px 0; 
+      padding: 16px; 
+      background: white; 
+      border-radius: 8px;
+      border: 1px solid #e1e5e9;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    
+    .section h3 { 
+      margin: 0 0 12px 0; 
+      color: #333;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    .section h4 {
+      margin: 12px 0 8px 0;
+      color: #555;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .value-list { 
+      display: flex; 
+      flex-wrap: wrap; 
+      gap: 8px; 
+      margin: 8px 0;
+    }
+    
+    .value-item { 
+      background: #f1f3f4; 
+      padding: 6px 12px; 
+      border-radius: 4px; 
+      font-size: 12px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      border: 1px solid #e1e5e9;
+    }
+    
+    .color-item {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: inline-block;
+      margin: 2px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      position: relative;
+    }
+    
+    .color-item:hover::after {
+      content: attr(title);
+      position: absolute;
+      bottom: -25px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #333;
+      color: white;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 10px;
+      white-space: nowrap;
+      z-index: 1000;
+    }
+    
+    .loading { 
+      text-align: center; 
+      padding: 40px; 
+      color: #666;
+    }
+    
+    .loading-spinner {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #0066cc;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: #e1e5e9;
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 12px 0;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: #0066cc;
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    
+    .code-output {
+      background: #f8f9fa;
+      border: 1px solid #e1e5e9;
+      border-radius: 4px;
+      padding: 12px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 11px;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      line-height: 1.3;
+    }
+    
+    .copy-button {
+      background: #28a745;
+      margin-top: 8px;
+      padding: 8px 16px;
+      font-size: 12px;
+      margin-right: 8px;
+    }
+    
+    .copy-button:hover {
+      background: #218838;
+    }
+    
+    .download-button {
+      background: #17a2b8;
+      margin-top: 8px;
+      padding: 8px 16px;
+      font-size: 12px;
+    }
+    
+    .download-button:hover {
+      background: #138496;
+    }
+    
+    .feature-highlight {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 20px;
+      border-radius: 12px;
+      margin: 16px 0;
+    }
+    
+    .feature-highlight h3 {
+      margin: 0 0 12px 0;
+      font-size: 16px;
+      color: white;
+    }
+    
+    .feature-highlight ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    
+    .feature-highlight li {
+      margin: 8px 0;
+      font-size: 14px;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 12px 0;
+    }
+    
+    .stat-item {
+      text-align: center;
+      padding: 12px;
+      background: #f8f9fa;
+      border-radius: 6px;
+      border: 1px solid #e1e5e9;
+    }
+    
+    .stat-number {
+      font-size: 18px;
+      font-weight: 600;
+      color: #0066cc;
+      display: block;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-top: 4px;
+    }
+    
+    .error {
+      background: #f8d7da;
+      color: #721c24;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #f5c6cb;
+      margin: 12px 0;
+    }
+    
+    .success {
+      background: #d4edda;
+      color: #155724;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #c3e6cb;
+      margin: 12px 0;
+    }
+    
+    .screen-card {
+      border: 1px solid #e1e5e9;
+      border-radius: 8px;
+      margin: 12px 0;
+      padding: 16px;
+      background: white;
+    }
+    
+    .screen-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    
+    .screen-title {
+      margin: 0;
+      color: #333;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    
+    .screen-meta {
+      margin: 0 0 12px 0;
+      color: #666;
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    
+    .button-small {
+      padding: 6px 12px;
+      font-size: 11px;
+      margin: 0;
+      flex: 1;
+      min-width: 100px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🌉 Figma to RN Design Bridge</h2>
+    <p>Transform your Figma designs into a maintainable React Native design system with responsive themes, semantic tokens, and production-ready components.</p>
+    
+    <div class="feature-highlight">
+      <h3>✨ What This Plugin Creates:</h3>
+      <ul>
+        <li>🎨 <strong>Responsive Theme System</strong> - Scales perfectly across devices</li>
+        <li>🔧 <strong>Semantic Design Tokens</strong> - Maintainable color, typography, spacing systems</li>
+        <li>📱 <strong>Ready-to-Use Components</strong> - Generated React Native screens</li>
+        <li>🔄 <strong>Design-Dev Sync</strong> - Keep Figma and code in perfect alignment</li>
+      </ul>
+    </div>
+    
+    <button class="button" onclick="extractValues()" id="extractValuesBtn">
+      🎨 Generate Design System
+    </button>
+    <button class="button" onclick="extractScreens()" id="extractScreensBtn">
+      📱 Extract Screens & Components
+    </button>
+    
+    <div id="loading" class="loading" style="display: none;">
+      <div class="loading-spinner"></div>
+      🔄 Building your React Native design system...
+      <div style="margin-top: 12px; font-size: 12px; color: #888;">
+        Analyzing components, extracting tokens, generating responsive themes...
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+    
+    <div id="results" style="display: none;">
+      <div class="section">
+        <h3>📊 Extraction Statistics</h3>
+        <div class="stats-grid" id="statsGrid">
+          <!-- Stats will be populated here -->
+        </div>
+      </div>
+      
+      <div class="section">
+        <h3>🎨 Design System Tokens</h3>
+        <div class="stats-grid">
+          <div>
+            <h4>Colors</h4>
+            <div id="colors" class="value-list"></div>
+          </div>
+          <div>
+            <h4>Typography</h4>
+            <div id="fontSizes" class="value-list"></div>
+          </div>
+          <div>
+            <h4>Spacing</h4>
+            <div id="spacing" class="value-list"></div>
+          </div>
+          <div>
+            <h4>Border Radius</h4>
+            <div id="borderRadius" class="value-list"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="section">
+        <h3>📱 Generated React Native Screens</h3>
+        <div id="screensOutput"></div>
+      </div>
+      
+      <div class="section">
+        <h3>🎨 Complete Design System Theme</h3>
+        <div id="themeOutput" class="code-output"></div>
+        <div class="button-group">
+          <button class="button copy-button" onclick="copyTheme()">📋 Copy Theme</button>
+          <button class="button download-button" onclick="downloadTheme()">💾 Download theme.ts</button>
+        </div>
+      </div>
+    </div>
+    
+    <div id="error" class="error" style="display: none;"></div>
+    <div id="success" class="success" style="display: none;"></div>
+  </div>
+
+  <script>
+    let extractedTheme = '';
+    let extractedScreens = [];
+    let currentProgress = 0;
+    
+    function extractValues() {
+      showLoading();
+      disableButtons();
+      resetProgress();
+      hideMessages();
+      
+      parent.postMessage({ pluginMessage: { type: 'extract-values' } }, '*');
+    }
+    
+    function extractScreens() {
+      showLoading();
+      disableButtons();
+      resetProgress();
+      hideMessages();
+      
+      parent.postMessage({ pluginMessage: { type: 'extract-screens' } }, '*');
+    }
+    
+    function showLoading() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('results').style.display = 'none';
+    }
+    
+    function hideLoading() {
+      document.getElementById('loading').style.display = 'none';
+      enableButtons();
+    }
+    
+    function disableButtons() {
+      document.getElementById('extractValuesBtn').disabled = true;
+      document.getElementById('extractScreensBtn').disabled = true;
+    }
+    
+    function enableButtons() {
+      document.getElementById('extractValuesBtn').disabled = false;
+      document.getElementById('extractScreensBtn').disabled = false;
+    }
+    
+    function resetProgress() {
+      currentProgress = 0;
+      updateProgress(0);
+    }
+    
+    function updateProgress(progress) {
+      currentProgress = progress;
+      document.getElementById('progressFill').style.width = progress + '%';
+    }
+    
+    function hideMessages() {
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('success').style.display = 'none';
+    }
+    
+    function showError(message) {
+      document.getElementById('error').textContent = message;
+      document.getElementById('error').style.display = 'block';
+      hideLoading();
+    }
+    
+    function showSuccess(message) {
+      document.getElementById('success').textContent = message;
+      document.getElementById('success').style.display = 'block';
+      setTimeout(() => {
+        document.getElementById('success').style.display = 'none';
+      }, 3000);
+    }
+    
+    function copyTheme() {
+      navigator.clipboard.writeText(extractedTheme).then(() => {
+        showSuccess('🎉 Design system theme copied to clipboard!');
+      }).catch(() => {
+        showError('Failed to copy to clipboard. Please try manually selecting and copying.');
+      });
+    }
+    
+    function downloadTheme() {
+      try {
+        const blob = new Blob([extractedTheme], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'theme.ts';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        showSuccess('Theme file downloaded successfully!');
+      } catch (error) {
+        showError('Failed to download file. Please try copying the code instead.');
+      }
+    }
+    
+    function copyScreen(screenCode) {
+      navigator.clipboard.writeText(screenCode).then(() => {
+        showSuccess('Screen code copied to clipboard!');
+      }).catch(() => {
+        showError('Failed to copy to clipboard.');
+      });
+    }
+    
+    function downloadScreen(screenName, screenCode) {
+      try {
+        const blob = new Blob([screenCode], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${screenName}.tsx`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        showSuccess(`${screenName}.tsx downloaded successfully!`);
+      } catch (error) {
+        showError('Failed to download file.');
+      }
+    }
+    
+    function displayStats(data) {
+      const statsGrid = document.getElementById('statsGrid');
+      const { extracted } = data;
+      
+      statsGrid.innerHTML = `
+        <div class="stat-item">
+          <span class="stat-number">${extracted.colors.length}</span>
+          <div class="stat-label">Colors</div>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number">${extracted.fontSizes.length}</span>
+          <div class="stat-label">Font Sizes</div>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number">${extracted.spacing.length}</span>
+          <div class="stat-label">Spacing Values</div>
+        </div>
+        <div class="stat-item">
+          <span class="stat-number">${extracted.borderRadius.length}</span>
+          <div class="stat-label">Border Radius</div>
+        </div>
+      `;
+    }
+    
+    onmessage = (event) => {
+      const msg = event.data.pluginMessage;
+      
+      if (msg.type === 'progress-update') {
+        updateProgress(msg.progress);
+        return;
+      }
+      
+      if (msg.type === 'extraction-complete') {
+        hideLoading();
+        document.getElementById('results').style.display = 'block';
+        
+        const { extracted, theme } = msg.data;
+        
+        // Display statistics
+        displayStats(msg.data);
+        
+        // Display colors
+        const colorsDiv = document.getElementById('colors');
+        colorsDiv.innerHTML = extracted.colors.map(color => 
+          `<div class="color-item" style="background-color: ${color}" title="${color}"></div>`
+        ).join('');
+        
+        // Display font sizes
+        const fontSizesDiv = document.getElementById('fontSizes');
+        fontSizesDiv.innerHTML = extracted.fontSizes.map(size => 
+          `<span class="value-item">${size}px</span>`
+        ).join('');
+        
+        // Display spacing
+        const spacingDiv = document.getElementById('spacing');
+        spacingDiv.innerHTML = extracted.spacing.map(space => 
+          `<span class="value-item">${space}px</span>`
+        ).join('');
+        
+        // Display border radius
+        const borderRadiusDiv = document.getElementById('borderRadius');
+        borderRadiusDiv.innerHTML = extracted.borderRadius.map(radius => 
+          `<span class="value-item">${radius}px</span>`
+        ).join('');
+        
+        // Generate theme code
+        generateThemeCode(theme);
+        
+        // Hide screens section when only extracting values
+        document.getElementById('screensOutput').innerHTML = '';
+        
+        showSuccess('Design system generated successfully!');
+      }
+      
+      if (msg.type === 'screens-extracted') {
+        hideLoading();
+        document.getElementById('results').style.display = 'block';
+        
+        const { screens, theme } = msg.data;
+        extractedScreens = screens;
+        
+        // Display screens
+        const screensDiv = document.getElementById('screensOutput');
+        screensDiv.innerHTML = screens.map((screen, index) => `
+          <div class="screen-card">
+            <div class="screen-header">
+              <h4 class="screen-title">${screen.structure.name}</h4>
+            </div>
+            <p class="screen-meta">
+              Dimensions: ${screen.structure.width} × ${screen.structure.height}px<br>
+              Components: ${screen.structure.components.length} elements
+            </p>
+            <div class="code-output" style="max-height: 150px; margin-bottom: 12px;">
+${screen.code.substring(0, 500)}...
+            </div>
+            <div class="button-group">
+              <button class="button copy-button button-small" onclick="copyScreen(\`${screen.code.replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`)">
+                📋 Copy Code
+              </button>
+              <button class="button download-button button-small" onclick="downloadScreen('${screen.structure.name}', \`${screen.code.replace(/`/g, '\\`').replace(/\\/g, '\\\\')}\`)">
+                💾 Download .tsx
+              </button>
+            </div>
+          </div>
+        `).join('');
+        
+        // Generate theme code
+        generateThemeCode(theme);
+        
+        // Hide basic extraction results when showing screens
+        document.getElementById('colors').innerHTML = '';
+        document.getElementById('fontSizes').innerHTML = '';
+        document.getElementById('spacing').innerHTML = '';
+        document.getElementById('borderRadius').innerHTML = '';
+        
+        // Update stats for screen extraction
+        const statsGrid = document.getElementById('statsGrid');
+        const totalComponents = screens.reduce((sum, screen) => sum + screen.structure.components.length, 0);
+        
+        statsGrid.innerHTML = `
+          <div class="stat-item">
+            <span class="stat-number">${screens.length}</span>
+            <div class="stat-label">Screens Generated</div>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number">${totalComponents}</span>
+            <div class="stat-label">Total Components</div>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number">${Object.keys(theme.colors).length}</span>
+            <div class="stat-label">Design Tokens</div>
+          </div>
+          <div class="stat-item">
+            <span class="stat-number">${screens.reduce((sum, screen) => sum + screen.code.split('\n').length, 0)}</span>
+            <div class="stat-label">Lines of Code</div>
+          </div>
+        `;
+        
+        showSuccess(`Successfully generated ${screens.length} React Native screens!`);
+      }
+      
+      if (msg.type === 'extraction-error') {
+        hideLoading();
+        showError('Error: ' + msg.error);
+      }
+    };
+    
+    function generateThemeCode(theme) {
+      // This is a simplified version - the full theme is generated in the TypeScript code
+      extractedTheme = `// theme/index.ts - Generated from Figma
+import { Dimensions, Platform } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
+
+// Base design dimensions
+const DESIGN_WIDTH = 375;
+const DESIGN_HEIGHT = 812;
+
+// Scaling utilities
+const scale = (size: number) => (width / DESIGN_WIDTH) * size;
+const verticalScale = (size: number) => (height / DESIGN_HEIGHT) * size;
+const moderateScale = (size: number, factor: number = 0.5) => 
+  size + (scale(size) - size) * factor;
+
+export const COLORS = ${JSON.stringify(theme.colors, null, 2)};
+
+export const TYPOGRAPHY = ${JSON.stringify(theme.typography, null, 2)};
+
+export const SPACING = ${JSON.stringify(theme.spacing, null, 2)};
+
+export const BORDER_RADIUS = ${JSON.stringify(theme.borderRadius, null, 2)};
+
+export const SHADOWS = ${JSON.stringify(theme.shadows, null, 2)};
+
+export const OPACITY = ${JSON.stringify(theme.opacity, null, 2)};
+
+// Responsive utilities
+export const responsiveSize = {
+  font: (size: number) => moderateScale(size, 0.3),
+  width: (size: number) => scale(size),
+  height: (size: number) => verticalScale(size),
+  padding: (size: number) => scale(size),
+  margin: (size: number) => scale(size),
+};
+
+// Platform-specific adjustments
+export const platformStyle = {
+  shadow: Platform.select({
+    ios: {
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
+    },
+    android: {
+      elevation: 5,
+    },
+  }),
+  fontSize: Platform.select({
+    ios: (size: number) => size,
+    android: (size: number) => size - 1,
+  }),
+};
+
+export default {
+  COLORS,
+  TYPOGRAPHY,
+  SPACING,
+  BORDER_RADIUS,
+  SHADOWS,
+  OPACITY,
+  responsiveSize,
+  platformStyle,
+};`;
+      
+      document.getElementById('themeOutput').textContent = extractedTheme;
+    }
+  </script>
+</body>
+</html>
