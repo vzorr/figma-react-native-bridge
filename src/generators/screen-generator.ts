@@ -1,5 +1,5 @@
 // src/generators/screen-generator.ts
-// Enhanced Screen Generator with Flow-Aware Code Generation
+// Enhanced Screen Generator with Flow-Aware Code Generation - TypeScript Fixed
 
 import { logger, LogFunction } from '@core/logger';
 import { ErrorHandler } from '@core/error-handler';
@@ -274,11 +274,11 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');`;
             break;
             
           case 'card':
-            jsx = this.generateCardJSX(component, theme, indent, flowContext, depth);
+            jsx = this.generateCardJSX(component, theme, indent, depth, flowContext);
             break;
             
           case 'navigation':
-            jsx = this.generateNavigationJSX(component, theme, indent, flowContext, depth);
+            jsx = this.generateNavigationJSX(component, theme, indent, depth, flowContext);
             break;
             
           case 'image':
@@ -287,7 +287,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');`;
             
           case 'container':
           default:
-            jsx = this.generateContainerJSX(component, theme, indent, flowContext, depth);
+            jsx = this.generateContainerJSX(component, theme, indent, depth, flowContext);
         }
         
         return jsx;
@@ -355,7 +355,8 @@ ${indent}  {text}
 ${indent}</Text>`;
   }
 
-  private generateCardJSX(component: ComponentStructure, theme: ThemeTokens, indent: string, flowContext?: any, depth: number): string {
+  // FIXED: Parameter order - required parameters before optional ones
+  private generateCardJSX(component: ComponentStructure, theme: ThemeTokens, indent: string, depth: number, flowContext?: any): string {
     const styleName = this.sanitizeStyleName(component.name);
     let jsx = `${indent}<View style={[styles.card, styles.${styleName}]}>`;
     
@@ -369,7 +370,8 @@ ${indent}</Text>`;
     return jsx;
   }
 
-  private generateNavigationJSX(component: ComponentStructure, theme: ThemeTokens, indent: string, flowContext?: any, depth: number): string {
+  // FIXED: Parameter order - required parameters before optional ones
+  private generateNavigationJSX(component: ComponentStructure, theme: ThemeTokens, indent: string, depth: number, flowContext?: any): string {
     const styleName = this.sanitizeStyleName(component.name);
     let jsx = `${indent}<View style={[styles.navigation, styles.${styleName}]}>`;
     
@@ -394,7 +396,8 @@ ${indent}  testID="${styleName}-image"
 ${indent}/>`;
   }
 
-  private generateContainerJSX(component: ComponentStructure, theme: ThemeTokens, indent: string, flowContext?: any, depth: number): string {
+  // FIXED: Parameter order - required parameters before optional ones
+  private generateContainerJSX(component: ComponentStructure, theme: ThemeTokens, indent: string, depth: number, flowContext?: any): string {
     const styleName = this.sanitizeStyleName(component.name);
     let jsx = `${indent}<View style={[styles.container, styles.${styleName}]}>`;
     

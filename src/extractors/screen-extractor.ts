@@ -47,46 +47,54 @@ export class ScreenExtractor {
   }
 
   @LogFunction(MODULE_NAME)
-  extractEnhancedScreenStructure(frame: any): ScreenStructure {
-    try {
-      const structure: ScreenStructure = {
-        name: frame.name,
-        width: safeGetNumber(frame.width),
-        height: safeGetNumber(frame.height),
-        page: frame.parent ? frame.parent.name : undefined,
-        backgroundColor: getNodeBackgroundColor(frame) || undefined,
-        components: frame.children ? this.extractComponentHierarchyWithSemantics(frame.children) : [],
-        layoutType: this.determineLayoutType(frame),
-        deviceType: this.determineDeviceType(safeGetNumber(frame.width), safeGetNumber(frame.height)),
-        designSystem: this.analyzeFrameDesignSystem(frame)
-      };
+ 
+  // In src/extractors/screen-extractor.ts - Update extractEnhancedScreenStructure method
 
-      logger.debug(MODULE_NAME, 'extractEnhancedScreenStructure', 'Screen structure extracted', {
-        name: structure.name,
-        components: structure.components.length,
-        deviceType: structure.deviceType
-      });
+@LogFunction(MODULE_NAME)
+extractEnhancedScreenStructure(frame: any): ScreenStructure {
+  try {
+    const structure: ScreenStructure = {
+      name: frame.name,
+      width: safeGetNumber(frame.width),
+      height: safeGetNumber(frame.height),
+      x: safeGetNumber(frame.x), // ADD THIS LINE
+      y: safeGetNumber(frame.y), // ADD THIS LINE
+      page: frame.parent ? frame.parent.name : undefined,
+      backgroundColor: getNodeBackgroundColor(frame) || undefined,
+      components: frame.children ? this.extractComponentHierarchyWithSemantics(frame.children) : [],
+      layoutType: this.determineLayoutType(frame),
+      deviceType: this.determineDeviceType(safeGetNumber(frame.width), safeGetNumber(frame.height)),
+      designSystem: this.analyzeFrameDesignSystem(frame)
+    };
 
-      return structure;
-    } catch (error) {
-      ErrorHandler.handle(error as Error, {
-        module: MODULE_NAME,
-        function: 'extractEnhancedScreenStructure',
-        operation: 'screen structure extraction',
-        nodeInfo: { name: frame.name, type: frame.type }
-      });
+    logger.debug(MODULE_NAME, 'extractEnhancedScreenStructure', 'Screen structure extracted', {
+      name: structure.name,
+      components: structure.components.length,
+      deviceType: structure.deviceType
+    });
 
-      // Return minimal structure on error
-      return {
-        name: frame.name || 'Unknown',
-        width: safeGetNumber(frame.width, 375),
-        height: safeGetNumber(frame.height, 667),
-        components: [],
-        layoutType: 'absolute',
-        deviceType: 'mobile'
-      };
-    }
+    return structure;
+  } catch (error) {
+    ErrorHandler.handle(error as Error, {
+      module: MODULE_NAME,
+      function: 'extractEnhancedScreenStructure',
+      operation: 'screen structure extraction',
+      nodeInfo: { name: frame.name, type: frame.type }
+    });
+
+    // Return minimal structure on error
+    return {
+      name: frame.name || 'Unknown',
+      width: safeGetNumber(frame.width, 375),
+      height: safeGetNumber(frame.height, 667),
+      x: safeGetNumber(frame.x, 0), // ADD THIS LINE
+      y: safeGetNumber(frame.y, 0), // ADD THIS LINE
+      components: [],
+      layoutType: 'absolute',
+      deviceType: 'mobile'
+    };
   }
+}
 
   @LogFunction(MODULE_NAME)
   extractComponentHierarchyWithSemantics(nodes: any[]): ComponentStructure[] {

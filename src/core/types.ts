@@ -111,6 +111,8 @@ export interface ScreenStructure {
   name: string;
   width: number;
   height: number;
+  x?: number;  // ADD THIS LINE
+  y?: number;  // ADD THIS LINE
   page?: string;
   backgroundColor?: string;
   components: ComponentStructure[];
@@ -247,6 +249,7 @@ export interface FlowStructure {
   parentFlow?: string;
   subFlows?: string[];
   estimatedDuration?: number; // minutes to complete flow
+  criticalPath?: boolean; // ADD THIS LINE
 }
 
 // Enhanced screen structure with flow context

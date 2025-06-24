@@ -1,3 +1,5 @@
+// src/detectors/flow-detector.ts
+// Complete Flow Detector implementation with TypeScript fixes
 
 import { logger, LogFunction } from '@core/logger';
 import { ErrorHandler } from '@core/error-handler';
@@ -6,6 +8,10 @@ import { FLOW_PATTERNS, DETECTION_THRESHOLDS } from '@core/constants';
 import { getAllPages } from '@utils/figma-helpers';
 
 const MODULE_NAME = 'FlowDetector';
+
+// Type definitions for flow detection
+type FlowType = 'unknown' | 'onboarding' | 'authentication' | 'main_feature' | 'settings' | 'checkout';
+type NavigationPattern = 'stack' | 'tab' | 'modal' | 'drawer' | 'mixed';
 
 export interface FlowDetectionStrategy {
   name: string;
@@ -165,8 +171,6 @@ export class FlowDetector {
       name: 'PrototypeLinks',
       confidence: 0.9,
       detect: (screens: ScreenStructure[]): FlowGroup[] => {
-        // Note: Figma API has limitations accessing prototype connections
-        // This is a foundation for when/if that becomes available
         const connectedGroups: FlowGroup[] = [];
         
         try {
@@ -293,6 +297,123 @@ export class FlowDetector {
     } catch (error) {
       logger.error(MODULE_NAME, FUNC_NAME, 'Error optimizing flow groups:', error as Error);
       return allGroups.filter(group => group.confidence >= 0.5);
+    }
+  }
+
+  // FIXED: Type-safe flow type detection methods
+  @LogFunction(MODULE_NAME)
+  private determineFlowTypeFromName(flowName: string): FlowType {
+    const lowerName = flowName.toLowerCase();
+    
+    // Check for onboarding patterns
+    if (lowerName.includes('onboard') || 
+        lowerName.includes('welcome') || 
+        lowerName.includes('intro') ||
+        lowerName.includes('getting started') ||
+        lowerName.includes('tutorial')) {
+      return 'onboarding';
+    }
+    
+    // Check for authentication patterns
+    if (lowerName.includes('auth') || 
+        lowerName.includes('login') || 
+        lowerName.includes('signin') ||
+        lowerName.includes('signup') ||
+        lowerName.includes('register') ||
+        lowerName.includes('password')) {
+      return 'authentication';
+    }
+    
+    // Check for checkout/payment patterns
+    if (lowerName.includes('checkout') || 
+        lowerName.includes('payment') || 
+        lowerName.includes('billing') ||
+        lowerName.includes('purchase') ||
+        lowerName.includes('cart') ||
+        lowerName.includes('order')) {
+      return 'checkout';
+    }
+    
+    // Check for settings patterns
+    if (lowerName.includes('setting') || 
+        lowerName.includes('config') || 
+        lowerName.includes('preference') ||
+        lowerName.includes('profile') ||
+        lowerName.includes('account')) {
+      return 'settings';
+    }
+    
+    // Check for main feature patterns
+    if (lowerName.includes('main') || 
+        lowerName.includes('home') || 
+        lowerName.includes('dashboard') ||
+        lowerName.includes('feed') ||
+        lowerName.includes('browse') ||
+        lowerName.includes('search')) {
+      return 'main_feature';
+    }
+    
+    // Default to unknown
+    return 'unknown';
+  }
+
+  private isValidFlowType(value: string): value is FlowType {
+    const validFlowTypes: FlowType[] = ['unknown', 'onboarding', 'authentication', 'main_feature', 'settings', 'checkout'];
+    return validFlowTypes.includes(value as FlowType);
+  }
+
+  private isValidNavigationPattern(value: string): value is NavigationPattern {
+    const validPatterns: NavigationPattern[] = ['stack', 'tab', 'modal', 'drawer', 'mixed'];
+    return validPatterns.includes(value as NavigationPattern);
+  }
+
+  private determineFlowType(group: FlowGroup): FlowStructure['flowType'] {
+    if (group.metadata.flowType && this.isValidFlowType(group.metadata.flowType)) {
+      return group.metadata.flowType as FlowStructure['flowType'];
+    }
+    return this.inferFlowTypeFromScreens(group.screens);
+  }
+
+  private determineNavigationPattern(group: FlowGroup): FlowStructure['navigationPattern'] {
+    if (group.metadata.navigationPattern && this.isValidNavigationPattern(group.metadata.navigationPattern)) {
+      return group.metadata.navigationPattern as FlowStructure['navigationPattern'];
+    }
+    
+    const screenCount = group.screens.length;
+    if (screenCount <= 2) return 'modal';
+    if (screenCount <= 5) return 'tab';
+    return 'stack';
+  }
+
+  private inferFlowTypeFromPageName(pageName: string): string {
+    const flowType = this.determineFlowTypeFromName(pageName);
+    return flowType;
+  }
+
+  private inferFlowTypeFromContent(screens: ScreenStructure[]): string {
+    // Analyze screen content to infer flow type
+    const combinedNames = screens.map(s => s.name.toLowerCase()).join(' ');
+    return this.determineFlowTypeFromName(combinedNames);
+  }
+
+  private inferFlowTypeFromScreens(screens: ScreenStructure[]): FlowStructure['flowType'] {
+    const combinedNames = screens.map(s => s.name.toLowerCase()).join(' ');
+    const detectedType = this.determineFlowTypeFromName(combinedNames);
+    
+    // Map our internal FlowType to FlowStructure['flowType']
+    switch (detectedType) {
+      case 'onboarding':
+        return 'onboarding';
+      case 'authentication':
+        return 'authentication';
+      case 'main_feature':
+        return 'main_feature';
+      case 'settings':
+        return 'settings';
+      case 'checkout':
+        return 'checkout';
+      default:
+        return 'unknown';
     }
   }
 
@@ -621,24 +742,6 @@ export class FlowDetector {
     };
   }
 
-  private determineFlowType(group: FlowGroup): FlowStructure['flowType'] {
-    if (group.metadata.flowType) {
-      return group.metadata.flowType as FlowStructure['flowType'];
-    }
-    return this.inferFlowTypeFromScreens(group.screens);
-  }
-
-  private determineNavigationPattern(group: FlowGroup): FlowStructure['navigationPattern'] {
-    if (group.metadata.navigationPattern) {
-      return group.metadata.navigationPattern as FlowStructure['navigationPattern'];
-    }
-    
-    const screenCount = group.screens.length;
-    if (screenCount <= 2) return 'modal';
-    if (screenCount <= 5) return 'tab';
-    return 'stack';
-  }
-
   private determineDeviceTargets(screens: ScreenStructure[]): ('mobile' | 'tablet' | 'desktop')[] {
     const targets = new Set<'mobile' | 'tablet' | 'desktop'>();
     screens.forEach(screen => {
@@ -661,30 +764,6 @@ export class FlowDetector {
 
   private inferNavigationFromSpatialLayout(screens: ScreenStructure[]): string {
     return 'spatial'; // Simplified for now
-  }
-
-  private inferFlowTypeFromPageName(pageName: string): string {
-    const name = pageName.toLowerCase();
-    for (const [flowType, patterns] of Object.entries(FLOW_PATTERNS.flowTypes)) {
-      if (patterns.some(pattern => name.includes(pattern))) {
-        return flowType;
-      }
-    }
-    return 'unknown';
-  }
-
-  private inferFlowTypeFromContent(screens: ScreenStructure[]): string {
-    return 'unknown'; // Simplified for now
-  }
-
-  private inferFlowTypeFromScreens(screens: ScreenStructure[]): string {
-    const combinedNames = screens.map(s => s.name.toLowerCase()).join(' ');
-    for (const [flowType, patterns] of Object.entries(FLOW_PATTERNS.flowTypes)) {
-      if (patterns.some(pattern => combinedNames.includes(pattern))) {
-        return flowType;
-      }
-    }
-    return 'main_feature';
   }
 
   private calculateRoleDistribution(roles: UserRole[]): Record<string, number> {
