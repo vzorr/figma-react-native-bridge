@@ -1,394 +1,404 @@
 // src/extractors/screen-extractor.ts
-// Complete implementation extracted from code.ts
+// Updated ScreenExtractor to use existing DeviceDetector and ComponentDetector
 
 import { logger, LogFunction } from '@core/logger';
 import { ErrorHandler } from '@core/error-handler';
-import { ScreenStructure, ComponentStructure } from '@core/types';
-import { safeGetNumber } from '@utils/number-utils';
-import { getAllPages, getAllFrames, getNodeBackgroundColor } from '@utils/figma-helpers';
+import { 
+  ScreenStructure, 
+  ComponentStructure, 
+  DesignSystemAnalysis,
+  DeviceType,
+  ComponentDetectionResult 
+} from '@core/types';
+import { safeGetNumber, safeGetWidth, safeGetHeight } from '@utils/number-utils';
+import { getNodeBackgroundColor } from '@utils/figma-helpers';
+
+// Import the existing detectors
+import DeviceDetector from '@detectors/device-detector';
+import ComponentDetector from '@detectors/component-detector';
 
 const MODULE_NAME = 'ScreenExtractor';
 
 export class ScreenExtractor {
+  // Use existing detectors for consistency
+  private deviceDetector = new DeviceDetector();
+  private componentDetector = new ComponentDetector();
 
   @LogFunction(MODULE_NAME, true)
-  extractAllScreens(): ScreenStructure[] {
+  extractScreenStructure(frame: any): ScreenStructure {
+    const FUNC_NAME = 'extractScreenStructure';
+    
     try {
-      logger.info(MODULE_NAME, 'extractAllScreens', 'Starting comprehensive screens extraction');
-      
-      // Find all frames in ALL pages, not just current page
-      const allFrames = getAllFrames();
-      
-      if (allFrames.length === 0) {
-        logger.warn(MODULE_NAME, 'extractAllScreens', 'No frames found across all pages');
-        return [];
-      }
-      
-      logger.info(MODULE_NAME, 'extractAllScreens', `Found ${allFrames.length} frames`);
-      
-      // Extract each frame as a screen with detailed analysis
-      const screens = allFrames.map((frame: any, index: number) => {
-        logger.debug(MODULE_NAME, 'extractAllScreens', `Extracting screen: ${frame.name} (${frame.width}x${frame.height})`);
+      logger.debug(MODULE_NAME, FUNC_NAME, 'Extracting screen structure', {
+        frameName: frame.name,
+        frameType: frame.type,
+        width: safeGetWidth(frame),
+        height: safeGetHeight(frame)
+      });
+
+      // Use existing DeviceDetector for device type detection
+      const deviceDetectionResult = this.deviceDetector.detectDevice(
+        safeGetNumber(frame.width), 
+        safeGetNumber(frame.height)
+      );
+
+      const screenStructure: ScreenStructure = {
+        name: frame.name || 'Unnamed Screen',
+        width: safeGetWidth(frame),
+        height: safeGetHeight(frame),
+        x: safeGetNumber(frame.x, 0),
+        y: safeGetNumber(frame.y, 0),
+        page: frame.parent ? frame.parent.name : undefined,
+        backgroundColor: getNodeBackgroundColor(frame) || undefined,
+        components: frame.children ? this.extractComponentHierarchyWithSemantics(frame.children) : [],
+        layoutType: this.determineLayoutType(frame),
+        deviceType: deviceDetectionResult.deviceType, // Using DeviceDetector result
+        designSystem: this.analyzeFrameDesignSystem(frame),
         
-        return this.extractEnhancedScreenStructure(frame);
-      });
-      
-      logger.info(MODULE_NAME, 'extractAllScreens', `Comprehensive extraction complete. Generated ${screens.length} screens`);
-      return screens;
-      
-    } catch (error) {
-      ErrorHandler.handle(error as Error, {
-        module: MODULE_NAME,
-        function: 'extractAllScreens',
-        operation: 'comprehensive screens extraction'
-      });
-      return [];
-    }
-  }
-
-  @LogFunction(MODULE_NAME)
- 
-  // In src/extractors/screen-extractor.ts - Update extractEnhancedScreenStructure method
-
-@LogFunction(MODULE_NAME)
-extractEnhancedScreenStructure(frame: any): ScreenStructure {
-  try {
-    const structure: ScreenStructure = {
-      name: frame.name,
-      width: safeGetNumber(frame.width),
-      height: safeGetNumber(frame.height),
-      x: safeGetNumber(frame.x), // ADD THIS LINE
-      y: safeGetNumber(frame.y), // ADD THIS LINE
-      page: frame.parent ? frame.parent.name : undefined,
-      backgroundColor: getNodeBackgroundColor(frame) || undefined,
-      components: frame.children ? this.extractComponentHierarchyWithSemantics(frame.children) : [],
-      layoutType: this.determineLayoutType(frame),
-      deviceType: this.determineDeviceType(safeGetNumber(frame.width), safeGetNumber(frame.height)),
-      designSystem: this.analyzeFrameDesignSystem(frame)
-    };
-
-    logger.debug(MODULE_NAME, 'extractEnhancedScreenStructure', 'Screen structure extracted', {
-      name: structure.name,
-      components: structure.components.length,
-      deviceType: structure.deviceType
-    });
-
-    return structure;
-  } catch (error) {
-    ErrorHandler.handle(error as Error, {
-      module: MODULE_NAME,
-      function: 'extractEnhancedScreenStructure',
-      operation: 'screen structure extraction',
-      nodeInfo: { name: frame.name, type: frame.type }
-    });
-
-    // Return minimal structure on error
-    return {
-      name: frame.name || 'Unknown',
-      width: safeGetNumber(frame.width, 375),
-      height: safeGetNumber(frame.height, 667),
-      x: safeGetNumber(frame.x, 0), // ADD THIS LINE
-      y: safeGetNumber(frame.y, 0), // ADD THIS LINE
-      components: [],
-      layoutType: 'absolute',
-      deviceType: 'mobile'
-    };
-  }
-}
-
-  @LogFunction(MODULE_NAME)
-  extractComponentHierarchyWithSemantics(nodes: any[]): ComponentStructure[] {
-    try {
-      return nodes
-        .map((node: any) => this.extractSemanticComponentData(node))
-        .filter((data: ComponentStructure | null) => data !== null) as ComponentStructure[];
-    } catch (error) {
-      logger.error(MODULE_NAME, 'extractComponentHierarchyWithSemantics', 'Error extracting component hierarchy:', error as Error);
-      return [];
-    }
-  }
-
-  @LogFunction(MODULE_NAME)
-  extractSemanticComponentData(node: any): ComponentStructure | null {
-    try {
-      const baseData: ComponentStructure = {
-        id: node.id,
-        name: node.name,
-        type: node.type,
-        semanticType: this.determineSemanticType(node),
-        x: safeGetNumber(node.x),
-        y: safeGetNumber(node.y),
-        width: safeGetNumber(node.width),
-        height: safeGetNumber(node.height),
-        backgroundColor: getNodeBackgroundColor(node) || undefined,
-        borderRadius: safeGetNumber(node.cornerRadius, 0)
+        // Enhanced with semantic analysis using ComponentDetector
+        semanticAnalysis: this.getScreenSemanticAnalysis(frame)
       };
 
-      if (node.type === 'TEXT') {
-        baseData.text = node.characters;
-        baseData.fontSize = safeGetNumber(node.fontSize);
-        baseData.fontWeight = this.getNodeFontWeight(node) || undefined;
-        baseData.textColor = this.getNodeTextColor(node) || undefined;
-        baseData.textAlign = node.textAlignHorizontal;
-      }
-
-      if ('children' in node && node.children && node.children.length > 0) {
-        baseData.children = this.extractComponentHierarchyWithSemantics(node.children);
-      }
-
-      return baseData;
-    } catch (error) {
-      logger.warn(MODULE_NAME, 'extractSemanticComponentData', 'Error extracting component data:', { 
-        error, 
-        node: node?.name 
+      logger.debug(MODULE_NAME, FUNC_NAME, 'Screen structure extracted successfully', {
+        screenName: screenStructure.name,
+        componentCount: screenStructure.components.length,
+        deviceType: screenStructure.deviceType,
+        hasDesignSystem: !!screenStructure.designSystem
       });
-      return null;
+
+      return screenStructure;
+
+    } catch (error) {
+      const errorInfo = ErrorHandler.handle(error as Error, {
+        module: MODULE_NAME,
+        function: FUNC_NAME,
+        operation: 'screen structure extraction'
+      });
+      logger.error(MODULE_NAME, FUNC_NAME, `Error extracting screen structure: ${errorInfo}`);
+      
+      // Return fallback structure
+      return this.createFallbackScreenStructure(frame);
     }
   }
 
   @LogFunction(MODULE_NAME)
-  private determineSemanticType(node: any): string {
+  private getScreenSemanticAnalysis(frame: any): ComponentDetectionResult {
+    const FUNC_NAME = 'getScreenSemanticAnalysis';
+    
     try {
-      const name = node.name.toLowerCase();
-      
-      if (this.isButton(node, name)) return 'button';
-      if (this.isInputField(node, name)) return 'input';
-      if (this.isHeading(node, name)) return 'heading';
-      if (this.isLabel(node, name)) return 'label';
-      if (this.isCard(node, name)) return 'card';
-      if (this.isNavigationItem(node, name)) return 'navigation';
-      if (node.type === 'TEXT') return 'text';
-      if (node.type === 'FRAME') return 'container';
-      if (node.type === 'RECTANGLE') return 'shape';
-      if (node.type === 'COMPONENT') return 'component';
-      if (node.type === 'INSTANCE') return 'instance';
-      
-      return 'element';
+      // Use existing ComponentDetector for semantic analysis
+      return this.componentDetector.detectComponentType(frame);
     } catch (error) {
-      return 'element';
+      logger.warn(MODULE_NAME, FUNC_NAME, 'Error in semantic analysis, using fallback');
+      return this.createFallbackSemanticAnalysis();
     }
+  }
+
+  @LogFunction(MODULE_NAME)
+  private extractComponentHierarchyWithSemantics(children: any[]): ComponentStructure[] {
+    const FUNC_NAME = 'extractComponentHierarchyWithSemantics';
+    
+    try {
+      if (!Array.isArray(children)) {
+        logger.warn(MODULE_NAME, FUNC_NAME, 'Children is not an array');
+        return [];
+      }
+
+      return children.map(child => this.extractSingleComponent(child)).filter(Boolean);
+    } catch (error) {
+      logger.error(MODULE_NAME, FUNC_NAME, `Error extracting component hierarchy: ${error}`);
+      return [];
+    }
+  }
+
+  @LogFunction(MODULE_NAME)
+  private extractSingleComponent(node: any): ComponentStructure {
+    const FUNC_NAME = 'extractSingleComponent';
+    
+    try {
+      // Use ComponentDetector for semantic type detection
+      const semanticAnalysis = this.componentDetector.detectComponentType(node);
+      const semanticType = this.determineSemanticType(semanticAnalysis);
+
+      const component: ComponentStructure = {
+        id: node.id || `component_${Date.now()}_${Math.random()}`,
+        name: node.name || 'Unnamed Component',
+        type: node.type || 'UNKNOWN',
+        semanticType: semanticType,
+        x: safeGetNumber(node.x, 0),
+        y: safeGetNumber(node.y, 0),
+        width: safeGetWidth(node),
+        height: safeGetHeight(node),
+        backgroundColor: getNodeBackgroundColor(node),
+        borderRadius: safeGetNumber(node.cornerRadius, 0),
+        text: this.extractTextContent(node),
+        fontSize: safeGetNumber(node.fontSize),
+        fontWeight: this.extractFontWeight(node),
+        textColor: this.extractTextColor(node),
+        textAlign: node.textAlignHorizontal || undefined,
+        children: node.children ? this.extractComponentHierarchyWithSemantics(node.children) : undefined
+      };
+
+      logger.debug(MODULE_NAME, FUNC_NAME, 'Component extracted', {
+        name: component.name,
+        type: component.type,
+        semanticType: component.semanticType,
+        hasChildren: !!component.children?.length
+      });
+
+      return component;
+
+    } catch (error) {
+      logger.error(MODULE_NAME, FUNC_NAME, `Error extracting component: ${error}`);
+      return this.createFallbackComponent(node);
+    }
+  }
+
+  @LogFunction(MODULE_NAME)
+  private determineSemanticType(analysis: ComponentDetectionResult): string | undefined {
+    // Convert ComponentDetectionResult to semantic type string
+    if (analysis.isButton && analysis.confidence > 0.6) return 'button';
+    if (analysis.isInput && analysis.confidence > 0.6) return 'input';
+    if (analysis.isHeading && analysis.confidence > 0.6) return 'heading';
+    if (analysis.isLabel && analysis.confidence > 0.6) return 'label';
+    if (analysis.isCard && analysis.confidence > 0.6) return 'card';
+    if (analysis.isNavigation && analysis.confidence > 0.6) return 'navigation';
+    
+    return undefined;
   }
 
   @LogFunction(MODULE_NAME)
   private determineLayoutType(frame: any): string {
+    const FUNC_NAME = 'determineLayoutType';
+    
     try {
-      if ('layoutMode' in frame) {
-        if (frame.layoutMode === 'VERTICAL') return 'column';
-        if (frame.layoutMode === 'HORIZONTAL') return 'row';
-      }
-      return 'absolute';
-    } catch (error) {
-      return 'absolute';
-    }
-  }
-
-  @LogFunction(MODULE_NAME)
-  private determineDeviceType(width: number, height: number): string {
-    try {
-      const aspectRatio = width / height;
-      
-      if (width <= 480) return 'mobile';
-      if (width <= 768) return 'tablet';
-      if (aspectRatio > 1.5) return 'desktop';
-      return 'tablet';
-    } catch (error) {
-      return 'mobile';
-    }
-  }
-
-  @LogFunction(MODULE_NAME)
-  private analyzeFrameDesignSystem(frame: any): any {
-    try {
-      const analysis = {
-        colorUsage: new Set<string>(),
-        fontSizeUsage: new Set<number>(),
-        spacingUsage: new Set<number>(),
-        componentTypes: new Set<string>()
-      };
-      
-      const allNodes = frame.findAll();
-      allNodes.forEach((node: any) => {
-        try {
-          // Analyze color usage
-          const bgColor = getNodeBackgroundColor(node);
-          if (bgColor) analysis.colorUsage.add(bgColor);
-          
-          const textColor = this.getNodeTextColor(node);
-          if (textColor) analysis.colorUsage.add(textColor);
-          
-          // Analyze typography
-          if (node.type === 'TEXT' && typeof node.fontSize === 'number') {
-            analysis.fontSizeUsage.add(node.fontSize);
-          }
-          
-          // Analyze spacing
-          if ('paddingLeft' in node && typeof node.paddingLeft === 'number') {
-            analysis.spacingUsage.add(node.paddingLeft);
-          }
-          
-          // Analyze component types
-          analysis.componentTypes.add(this.determineSemanticType(node));
-        } catch (nodeError) {
-          // Skip problematic nodes
+      // Check Figma's auto layout properties
+      if (frame.layoutMode) {
+        switch (frame.layoutMode) {
+          case 'HORIZONTAL':
+            return 'horizontal';
+          case 'VERTICAL':
+            return 'vertical';
+          default:
+            return 'auto';
         }
+      }
+
+      // Fallback analysis based on children positioning
+      if (frame.children && frame.children.length > 1) {
+        return this.inferLayoutFromChildren(frame.children);
+      }
+
+      return 'none';
+
+    } catch (error) {
+      logger.error(MODULE_NAME, FUNC_NAME, `Error determining layout type: ${error}`);
+      return 'unknown';
+    }
+  }
+
+  @LogFunction(MODULE_NAME)
+  private inferLayoutFromChildren(children: any[]): string {
+    const FUNC_NAME = 'inferLayoutFromChildren';
+    
+    try {
+      if (children.length < 2) return 'none';
+
+      const positions = children.map(child => ({
+        x: safeGetNumber(child.x, 0),
+        y: safeGetNumber(child.y, 0)
+      }));
+
+      // Check if children are arranged horizontally
+      const yVariance = this.calculateVariance(positions.map(p => p.y));
+      const xVariance = this.calculateVariance(positions.map(p => p.x));
+
+      if (yVariance < 50 && xVariance > 50) {
+        return 'horizontal';
+      } else if (xVariance < 50 && yVariance > 50) {
+        return 'vertical';
+      } else if (yVariance < 50 && xVariance < 50) {
+        return 'grid';
+      }
+
+      return 'mixed';
+
+    } catch (error) {
+      logger.error(MODULE_NAME, FUNC_NAME, `Error inferring layout: ${error}`);
+      return 'unknown';
+    }
+  }
+
+  @LogFunction(MODULE_NAME)
+  private analyzeFrameDesignSystem(frame: any): DesignSystemAnalysis {
+    const FUNC_NAME = 'analyzeFrameDesignSystem';
+    
+    try {
+      const colorUsage = new Set<string>();
+      const fontSizeUsage = new Set<number>();
+      const spacingUsage = new Set<number>();
+      const componentTypes: string[] = [];
+
+      this.collectDesignTokens(frame, colorUsage, fontSizeUsage, spacingUsage, componentTypes);
+
+      const analysis: DesignSystemAnalysis = {
+        uniqueColors: colorUsage.size,
+        uniqueFontSizes: fontSizeUsage.size,
+        uniqueSpacings: spacingUsage.size,
+        componentTypes: [...new Set(componentTypes)],
+        colorUsage,
+        fontSizeUsage,
+        spacingUsage
+      };
+
+      logger.debug(MODULE_NAME, FUNC_NAME, 'Design system analysis complete', {
+        uniqueColors: analysis.uniqueColors,
+        uniqueFontSizes: analysis.uniqueFontSizes,
+        componentTypes: analysis.componentTypes.length
       });
-      
-      return {
-        uniqueColors: analysis.colorUsage.size,
-        uniqueFontSizes: analysis.fontSizeUsage.size,
-        uniqueSpacings: analysis.spacingUsage.size,
-        componentTypes: Array.from(analysis.componentTypes)
-      };
+
+      return analysis;
+
     } catch (error) {
-      logger.error(MODULE_NAME, 'analyzeFrameDesignSystem', 'Error analyzing design system:', error as Error);
-      return {
-        uniqueColors: 0,
-        uniqueFontSizes: 0,
-        uniqueSpacings: 0,
-        componentTypes: []
-      };
+      logger.error(MODULE_NAME, FUNC_NAME, `Error analyzing design system: ${error}`);
+      return this.createFallbackDesignSystem();
     }
   }
 
-  // Component detection methods (simplified versions)
-  private isButton(node: any, name: string): boolean {
-    return (
-      name.includes('button') || 
-      name.includes('btn') || 
-      name.includes('cta') ||
-      name.includes('action') ||
-      (node.type === 'COMPONENT' && this.hasButtonCharacteristics(node))
-    );
-  }
-
-  private isInputField(node: any, name: string): boolean {
-    return (
-      name.includes('input') ||
-      name.includes('field') ||
-      name.includes('textbox') ||
-      (node.type === 'FRAME' && this.hasInputCharacteristics(node))
-    );
-  }
-
-  private isHeading(node: any, name: string): boolean {
-    return (
-      node.type === 'TEXT' && (
-        name.includes('heading') ||
-        name.includes('title') ||
-        name.includes('h1') ||
-        name.includes('h2') ||
-        (typeof node.fontSize === 'number' && node.fontSize >= 24)
-      )
-    );
-  }
-
-  private isLabel(node: any, name: string): boolean {
-    return (
-      node.type === 'TEXT' && (
-        name.includes('label') ||
-        name.includes('caption') ||
-        name.includes('subtitle') ||
-        (typeof node.fontSize === 'number' && node.fontSize <= 14)
-      )
-    );
-  }
-
-  private isCard(node: any, name: string): boolean {
-    return (
-      name.includes('card') ||
-      name.includes('item') ||
-      name.includes('tile') ||
-      (node.type === 'FRAME' && this.hasCardCharacteristics(node))
-    );
-  }
-
-  private isNavigationItem(node: any, name: string): boolean {
-    return (
-      name.includes('nav') ||
-      name.includes('tab') ||
-      name.includes('menu') ||
-      name.includes('bar')
-    );
-  }
-
-  // Characteristic detection helpers
-  private hasButtonCharacteristics(node: any): boolean {
+  @LogFunction(MODULE_NAME)
+  private collectDesignTokens(
+    node: any, 
+    colors: Set<string>, 
+    fontSizes: Set<number>, 
+    spacings: Set<number>, 
+    componentTypes: string[]
+  ): void {
     try {
-      const width = safeGetNumber(node.width);
-      const height = safeGetNumber(node.height);
-      const cornerRadius = safeGetNumber(node.cornerRadius);
-      
-      return (
-        cornerRadius > 0 &&
-        'fills' in node && node.fills && node.fills.length > 0 &&
-        width > 60 && height > 30 && height < 80
-      );
+      // Collect background colors
+      const bgColor = getNodeBackgroundColor(node);
+      if (bgColor) colors.add(bgColor);
+
+      // Collect font sizes
+      if (node.fontSize) fontSizes.add(safeGetNumber(node.fontSize));
+
+      // Collect spacing (padding, margins)
+      if (node.paddingTop) spacings.add(safeGetNumber(node.paddingTop));
+      if (node.paddingRight) spacings.add(safeGetNumber(node.paddingRight));
+      if (node.paddingBottom) spacings.add(safeGetNumber(node.paddingBottom));
+      if (node.paddingLeft) spacings.add(safeGetNumber(node.paddingLeft));
+      if (node.itemSpacing) spacings.add(safeGetNumber(node.itemSpacing));
+
+      // Collect component types using ComponentDetector
+      const semanticAnalysis = this.componentDetector.detectComponentType(node);
+      const semanticType = this.determineSemanticType(semanticAnalysis);
+      if (semanticType) componentTypes.push(semanticType);
+
+      // Recursively collect from children
+      if (node.children && Array.isArray(node.children)) {
+        node.children.forEach((child: any) => {
+          this.collectDesignTokens(child, colors, fontSizes, spacings, componentTypes);
+        });
+      }
     } catch (error) {
-      return false;
+      // Silent fail for individual token collection
     }
   }
 
-  private hasInputCharacteristics(node: any): boolean {
+  // Helper methods
+  private extractTextContent(node: any): string | undefined {
     try {
-      const width = safeGetNumber(node.width);
-      const height = safeGetNumber(node.height);
-      
-      return (
-        width > 100 && height > 30 && height < 60 &&
-        'strokes' in node && node.strokes && node.strokes.length > 0
-      );
+      if (node.type === 'TEXT' && node.characters) {
+        return node.characters;
+      }
+      return undefined;
     } catch (error) {
-      return false;
+      return undefined;
     }
   }
 
-  private hasCardCharacteristics(node: any): boolean {
+  private extractFontWeight(node: any): string | undefined {
     try {
-      const width = safeGetNumber(node.width);
-      const height = safeGetNumber(node.height);
-      
-      return (
-        width > 200 && height > 100 &&
-        'children' in node && node.children && node.children.length > 1
-      );
+      if (node.fontName && node.fontName.style) {
+        return node.fontName.style;
+      }
+      return undefined;
     } catch (error) {
-      return false;
+      return undefined;
     }
   }
 
-  // Helper methods for text processing
-  private getNodeTextColor(node: any): string | null {
+  private extractTextColor(node: any): string | undefined {
     try {
-      if (node.type === 'TEXT' && 'fills' in node && node.fills && node.fills.length > 0) {
-        const fill = node.fills[0];
-        if (fill.type === 'SOLID' && fill.color) {
-          return this.rgbToHex(fill.color.r, fill.color.g, fill.color.b);
+      if (node.fills && Array.isArray(node.fills) && node.fills.length > 0) {
+        const textFill = node.fills[0];
+        if (textFill.type === 'SOLID' && textFill.color) {
+          const { r, g, b } = textFill.color;
+          return `rgb(${Math.round(r * 255)}, ${Math.round(g * 255)}, ${Math.round(b * 255)})`;
         }
       }
-      return null;
+      return undefined;
     } catch (error) {
-      return null;
+      return undefined;
     }
   }
 
-  private getNodeFontWeight(node: any): string | null {
-    try {
-      if (node.type === 'TEXT' && node.fontName && node.fontName !== figma.mixed && typeof node.fontName === 'object') {
-        if (node.fontName.style && typeof node.fontName.style === 'string') {
-          return node.fontName.style;
-        }
-      }
-      return null;
-    } catch (error) {
-      return null;
-    }
+  private calculateVariance(numbers: number[]): number {
+    if (numbers.length === 0) return 0;
+    const mean = numbers.reduce((sum, num) => sum + num, 0) / numbers.length;
+    const variance = numbers.reduce((sum, num) => sum + Math.pow(num - mean, 2), 0) / numbers.length;
+    return Math.sqrt(variance);
   }
 
-  private rgbToHex(r: number, g: number, b: number): string {
-    const toHex = (c: number): string => {
-      const hex = Math.round(c * 255).toString(16);
-      return hex.length === 1 ? '0' + hex : hex;
+  // Fallback methods
+  private createFallbackScreenStructure(frame: any): ScreenStructure {
+    return {
+      name: frame?.name || 'Error Screen',
+      width: safeGetWidth(frame),
+      height: safeGetHeight(frame),
+      x: 0,
+      y: 0,
+      components: [],
+      deviceType: 'unknown' as DeviceType,
+      semanticAnalysis: this.createFallbackSemanticAnalysis()
     };
-    return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+  }
+
+  private createFallbackComponent(node: any): ComponentStructure {
+    return {
+      id: `fallback_${Date.now()}`,
+      name: node?.name || 'Error Component',
+      type: node?.type || 'UNKNOWN',
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0
+    };
+  }
+
+  private createFallbackSemanticAnalysis(): ComponentDetectionResult {
+    return {
+      isButton: false,
+      isInput: false,
+      isHeading: false,
+      isLabel: false,
+      isCard: false,
+      isNavigation: false,
+      confidence: 0,
+      reasons: ['Fallback analysis due to error']
+    };
+  }
+
+  private createFallbackDesignSystem(): DesignSystemAnalysis {
+    return {
+      uniqueColors: 0,
+      uniqueFontSizes: 0,
+      uniqueSpacings: 0,
+      componentTypes: [],
+      colorUsage: new Set(),
+      fontSizeUsage: new Set(),
+      spacingUsage: new Set()
+    };
   }
 }
+
+export default ScreenExtractor;

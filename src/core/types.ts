@@ -1,6 +1,6 @@
 // src/core/types.ts
 // Core type definitions for the Figma React Native Bridge Plugin
-// Added missing PluginState interface
+// FIXED: Added missing interfaces and extended ScreenStructure
 
 export interface FigmaNode {
   id: string;
@@ -29,6 +29,32 @@ export interface FigmaNode {
   textAlignHorizontal?: string;
   lineHeight?: any;
   parent?: FigmaNode;
+}
+
+// ADDED: Missing interfaces from detector files
+export type DeviceType = 'mobile' | 'tablet' | 'desktop' | 'unknown';
+
+export interface ComponentDetectionResult {
+  isButton: boolean;
+  isInput: boolean;
+  isHeading: boolean;
+  isLabel: boolean;
+  isCard: boolean;
+  isNavigation: boolean;
+  confidence: number;
+  reasons: string[];
+}
+
+export interface DeviceDetectionResult {
+  deviceType: DeviceType;
+  orientation: 'portrait' | 'landscape' | 'square';
+  confidence: number;
+  characteristics: {
+    width: number;
+    height: number;
+    aspectRatio: number;
+    pixelDensity?: string;
+  };
 }
 
 // ADDED: Missing PluginState interface used in main.ts
@@ -119,6 +145,7 @@ export interface ComponentTokens {
   };
 }
 
+// UPDATED: Extended ScreenStructure to include enhanced properties from main.ts
 export interface ScreenStructure {
   name: string;
   width: number;
@@ -129,8 +156,11 @@ export interface ScreenStructure {
   backgroundColor?: string;
   components: ComponentStructure[];
   layoutType?: string;
-  deviceType?: string;
+  deviceType?: DeviceType; // ADDED: From device detector
   designSystem?: DesignSystemAnalysis;
+  
+  // ADDED: Enhancement properties from main.ts
+  semanticAnalysis?: ComponentDetectionResult; // ADDED: From component detector
 }
 
 export interface ComponentStructure {

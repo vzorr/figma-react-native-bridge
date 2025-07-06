@@ -1,5 +1,5 @@
 // src/utils/figma-helpers.ts
-// Safe Figma API helpers with Symbol handling - FULL ORIGINAL VERSION
+// Enhanced Figma API helpers with complete hierarchy traversal support
 
 import { logger, LogFunction } from '@core/logger';
 import { safeGetNumber, isValidNumber } from '@utils/number-utils';
@@ -30,7 +30,7 @@ export function rgbToHex(r: number, g: number, b: number): string {
 }
 
 /**
- * NEW: Safely check for figma.mixed values (ONLY ADDITION)
+ * Safely check for figma.mixed values
  */
 export function isNotMixed(value: any): boolean {
   try {
@@ -41,7 +41,7 @@ export function isNotMixed(value: any): boolean {
 }
 
 /**
- * Safely get all pages (ENHANCED with better error handling)
+ * Get all pages from the document
  */
 export function getAllPages(): any[] {
   const FUNC_NAME = 'getAllPages';
@@ -67,7 +67,7 @@ export function getAllPages(): any[] {
 }
 
 /**
- * Safely get all frames from pages
+ * Get all frames from all pages
  */
 export function getAllFrames(): any[] {
   const FUNC_NAME = 'getAllFrames';
@@ -79,7 +79,9 @@ export function getAllFrames(): any[] {
     allPages.forEach((page: any) => {
       try {
         if (page.children && Array.isArray(page.children)) {
-          const pageFrames = page.children.filter((node: any) => node.type === 'FRAME');
+          const pageFrames = page.children.filter((node: any) => 
+            node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE'
+          );
           allFrames = allFrames.concat(pageFrames);
           logger.debug(MODULE_NAME, FUNC_NAME, `Page ${page.name}: ${pageFrames.length} frames`);
         }
@@ -97,15 +99,65 @@ export function getAllFrames(): any[] {
 }
 
 /**
- * Safely find all nodes in a page
+ * NEW: Find all nodes recursively in a page or node, including ALL children
+ */
+export function findAllNodesRecursively(rootNode: any): any[] {
+  const FUNC_NAME = 'findAllNodesRecursively';
+  
+  try {
+    const allNodes: any[] = [];
+    
+    const traverseNode = (node: any) => {
+      try {
+        allNodes.push(node);
+        
+        // Check if node can have children
+        if (nodeCanHaveChildren(node) && node.children && Array.isArray(node.children)) {
+          node.children.forEach((child: any) => {
+            traverseNode(child);
+          });
+        }
+      } catch (nodeError) {
+        logger.warn(MODULE_NAME, FUNC_NAME, `Error traversing node ${node?.name}:`, { error: nodeError });
+      }
+    };
+    
+    traverseNode(rootNode);
+    
+    logger.debug(MODULE_NAME, FUNC_NAME, `Found ${allNodes.length} total nodes in hierarchy`);
+    return allNodes;
+    
+  } catch (error) {
+    logger.error(MODULE_NAME, FUNC_NAME, 'Error finding nodes recursively:', error as Error);
+    return [];
+  }
+}
+
+/**
+ * NEW: Check if a node can have children
+ */
+export function nodeCanHaveChildren(node: any): boolean {
+  if (!node || !node.type) return false;
+  
+  const parentNodeTypes = [
+    'FRAME', 'GROUP', 'COMPONENT', 'INSTANCE', 
+    'COMPONENT_SET', 'BOOLEAN_OPERATION', 'SECTION',
+    'PAGE', 'DOCUMENT'
+  ];
+  
+  return parentNodeTypes.includes(node.type);
+}
+
+/**
+ * Find all nodes in a page using the safe findAll method
  */
 export function findAllNodes(page: any): any[] {
   const FUNC_NAME = 'findAllNodes';
   
   try {
     if (!page || typeof page.findAll !== 'function') {
-      logger.warn(MODULE_NAME, FUNC_NAME, 'Invalid page or no findAll method');
-      return [];
+      logger.warn(MODULE_NAME, FUNC_NAME, 'Invalid page or no findAll method, using recursive search');
+      return findAllNodesRecursively(page);
     }
     
     const nodes = page.findAll();
@@ -113,12 +165,49 @@ export function findAllNodes(page: any): any[] {
     return nodes;
   } catch (error) {
     logger.error(MODULE_NAME, FUNC_NAME, 'Error finding nodes:', error as Error, { page: page?.name });
+    // Fallback to recursive search
+    return findAllNodesRecursively(page);
+  }
+}
+
+/**
+ * NEW: Extract complete hierarchy from selected nodes or current page
+ */
+export function extractCompleteHierarchy(selectedNodes?: any[]): any[] {
+  const FUNC_NAME = 'extractCompleteHierarchy';
+  
+  try {
+    let rootNodes: any[] = [];
+    
+    if (selectedNodes && selectedNodes.length > 0) {
+      rootNodes = selectedNodes;
+      logger.info(MODULE_NAME, FUNC_NAME, `Using ${selectedNodes.length} selected nodes as roots`);
+    } else {
+      // Get all top-level frames from current page
+      rootNodes = figma.currentPage.children.filter(node => 
+        node.type === 'FRAME' || node.type === 'COMPONENT' || node.type === 'INSTANCE'
+      );
+      logger.info(MODULE_NAME, FUNC_NAME, `Using ${rootNodes.length} frames from current page`);
+    }
+    
+    // Extract complete hierarchy for each root node
+    const allNodes: any[] = [];
+    rootNodes.forEach(rootNode => {
+      const hierarchyNodes = findAllNodesRecursively(rootNode);
+      allNodes.push(...hierarchyNodes);
+    });
+    
+    logger.info(MODULE_NAME, FUNC_NAME, `Extracted complete hierarchy: ${allNodes.length} total nodes`);
+    return allNodes;
+    
+  } catch (error) {
+    logger.error(MODULE_NAME, FUNC_NAME, 'Error extracting complete hierarchy:', error as Error);
     return [];
   }
 }
 
 /**
- * Safely get node background color
+ * Get node background color safely
  */
 export function getNodeBackgroundColor(node: any): string | null {
   const FUNC_NAME = 'getNodeBackgroundColor';
@@ -152,7 +241,7 @@ export function getNodeBackgroundColor(node: any): string | null {
 }
 
 /**
- * Safely get node text color
+ * Get node text color safely
  */
 export function getNodeTextColor(node: any): string | null {
   const FUNC_NAME = 'getNodeTextColor';
@@ -175,7 +264,7 @@ export function getNodeTextColor(node: any): string | null {
     }
     
     // Search in children
-    if ('children' in node && node.children && Array.isArray(node.children)) {
+    if (nodeCanHaveChildren(node) && node.children && Array.isArray(node.children)) {
       for (const child of node.children) {
         if (child.type === 'TEXT') {
           const color = getNodeTextColor(child);
@@ -192,7 +281,7 @@ export function getNodeTextColor(node: any): string | null {
 }
 
 /**
- * Safely get node border color
+ * Get node border color safely
  */
 export function getNodeBorderColor(node: any): string | null {
   const FUNC_NAME = 'getNodeBorderColor';
@@ -223,7 +312,7 @@ export function getNodeBorderColor(node: any): string | null {
 }
 
 /**
- * Safely get node font size
+ * Get node font size safely
  */
 export function getNodeFontSize(node: any): number | null {
   const FUNC_NAME = 'getNodeFontSize';
@@ -233,7 +322,7 @@ export function getNodeFontSize(node: any): number | null {
       return safeGetNumber(node.fontSize);
     }
     
-    if ('children' in node && node.children && Array.isArray(node.children)) {
+    if (nodeCanHaveChildren(node) && node.children && Array.isArray(node.children)) {
       for (const child of node.children) {
         const fontSize = getNodeFontSize(child);
         if (fontSize) return fontSize;
@@ -248,7 +337,7 @@ export function getNodeFontSize(node: any): number | null {
 }
 
 /**
- * Safely get node font weight
+ * Get node font weight safely
  */
 export function getNodeFontWeight(node: any): string | null {
   const FUNC_NAME = 'getNodeFontWeight';
@@ -261,7 +350,7 @@ export function getNodeFontWeight(node: any): string | null {
       }
     }
     
-    if ('children' in node && node.children && Array.isArray(node.children)) {
+    if (nodeCanHaveChildren(node) && node.children && Array.isArray(node.children)) {
       for (const child of node.children) {
         const fontWeight = getNodeFontWeight(child);
         if (fontWeight) return fontWeight;
@@ -276,7 +365,7 @@ export function getNodeFontWeight(node: any): string | null {
 }
 
 /**
- * Safely get node shadow
+ * Get node shadow safely
  */
 export function getNodeShadow(node: any): string | null {
   const FUNC_NAME = 'getNodeShadow';
@@ -311,7 +400,7 @@ export function getNodeShadow(node: any): string | null {
 }
 
 /**
- * Safely get node padding
+ * Get node padding safely
  */
 export function getNodePadding(node: any): { top: number; right: number; bottom: number; left: number } {
   const FUNC_NAME = 'getNodePadding';
@@ -330,7 +419,7 @@ export function getNodePadding(node: any): { top: number; right: number; bottom:
 }
 
 /**
- * Safely get node line height
+ * Get node line height safely
  */
 export function getNodeLineHeight(node: any): number | null {
   const FUNC_NAME = 'getNodeLineHeight';
@@ -349,7 +438,7 @@ export function getNodeLineHeight(node: any): number | null {
 }
 
 /**
- * Safely get node placeholder text
+ * Get node placeholder text
  */
 export function getNodePlaceholder(node: any): string | null {
   const FUNC_NAME = 'getNodePlaceholder';
@@ -366,7 +455,7 @@ export function getNodePlaceholder(node: any): string | null {
 }
 
 /**
- * Safely get semantic color name
+ * Get semantic color name from hex
  */
 export function getSemanticColorName(hex: string): string | null {
   const FUNC_NAME = 'getSemanticColorName';
@@ -399,7 +488,7 @@ export function getSemanticColorName(hex: string): string | null {
 }
 
 /**
- * Safely sanitize name for code generation
+ * Sanitize name for code generation
  */
 export function sanitizeName(name: string): string {
   const FUNC_NAME = 'sanitizeName';
@@ -458,7 +547,7 @@ export function hasEffects(node: any): boolean {
  */
 export function hasMultipleChildren(node: any): boolean {
   try {
-    return 'children' in node && node.children && Array.isArray(node.children) && node.children.length > 1;
+    return nodeCanHaveChildren(node) && node.children && Array.isArray(node.children) && node.children.length > 1;
   } catch (error) {
     return false;
   }
@@ -471,7 +560,7 @@ export function findTextInChildren(node: any): boolean {
   try {
     if (node.type === 'TEXT') return true;
     
-    if (!node.children || !Array.isArray(node.children)) return false;
+    if (!nodeCanHaveChildren(node) || !node.children || !Array.isArray(node.children)) return false;
     
     return node.children.some((child: any) => 
       child.type === 'TEXT' || findTextInChildren(child)
@@ -484,7 +573,7 @@ export function findTextInChildren(node: any): boolean {
 /**
  * Send progress update to UI
  */
-export function sendProgress(progress: number): void {
+export function sendProgress(progress: number, message?: string): void {
   const FUNC_NAME = 'sendProgress';
   
   try {
@@ -494,14 +583,41 @@ export function sendProgress(progress: number): void {
     }
     
     figma.ui.postMessage({
-      type: 'progress-update',
-      progress: Math.min(100, Math.max(0, progress))
+      type: 'PROGRESS_UPDATE',
+      progress: Math.min(100, Math.max(0, progress)),
+      message: message || `Progress: ${progress}%`
     });
     
-    logger.debug(MODULE_NAME, FUNC_NAME, `Progress: ${progress}%`);
+    logger.debug(MODULE_NAME, FUNC_NAME, `Progress: ${progress}%`, { message });
   } catch (error) {
-    logger.error(MODULE_NAME, FUNC_NAME, 'Error sending progress:', error as Error, { progress });
+    logger.error(MODULE_NAME, FUNC_NAME, 'Error sending progress:', error as Error, { progress, message });
   }
+}
+
+/**
+ * NEW: Count total nodes in a hierarchy
+ */
+export function countNodesInHierarchy(rootNodes: any[]): number {
+  let count = 0;
+  
+  rootNodes.forEach(rootNode => {
+    const allNodes = findAllNodesRecursively(rootNode);
+    count += allNodes.length;
+  });
+  
+  return count;
+}
+
+/**
+ * NEW: Get node dimensions safely
+ */
+export function getNodeDimensions(node: any): { x: number; y: number; width: number; height: number } {
+  return {
+    x: safeGetNumber(node.x, 0),
+    y: safeGetNumber(node.y, 0),
+    width: safeGetNumber(node.width, 0),
+    height: safeGetNumber(node.height, 0)
+  };
 }
 
 export default {
@@ -526,5 +642,10 @@ export default {
   getAllPages,
   getAllFrames,
   findAllNodes,
-  sendProgress
+  findAllNodesRecursively,
+  nodeCanHaveChildren,
+  extractCompleteHierarchy,
+  sendProgress,
+  countNodesInHierarchy,
+  getNodeDimensions
 };

@@ -3,26 +3,487 @@
 <head>
   <meta charset="utf-8">
   <title>Figma React Native Bridge - Advanced Flow Navigator</title>
-  <link rel="stylesheet" href="styles.css">
+  <style>
+* { 
+  box-sizing: border-box; 
+}
+
+body { 
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  padding: 0; 
+  margin: 0;
+  background: #f7f8fa;
+  font-size: 13px;
+  line-height: 1.4;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.app-container { 
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header with breadcrumbs */
+.header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+
+.header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.breadcrumb {
+  font-size: 12px;
+  opacity: 0.9;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.breadcrumb-item {
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.breadcrumb-item:hover {
+  background: rgba(255,255,255,0.1);
+}
+
+.breadcrumb-separator {
+  opacity: 0.6;
+}
+
+/* Progress bar */
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.2);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 12px 0;
+}
+
+.progress-fill {
+  height: 100%;
+  background: rgba(255,255,255,0.8);
+  transition: width 0.3s ease;
+  width: 0%;
+  border-radius: 2px;
+}
+
+/* Main content area */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+/* Dashboard View */
+.dashboard {
+  max-width: 100%;
+}
+
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.dashboard-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.dashboard-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: #666;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Action Grid - NEW */
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin: 20px 0;
+}
+
+.action-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #e1e8ed;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.action-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
+  border-color: #667eea;
+}
+
+.action-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.action-icon {
+  font-size: 24px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.action-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.action-description {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
+  margin-bottom: 16px;
+}
+
+.action-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.feature-tag {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  color: #666;
+}
+
+.action-button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.action-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.action-button.secondary {
+  background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+}
+
+.action-button.success {
+  background: linear-gradient(135deg, #00b894 0%, #00a085 100%);
+}
+
+/* NEW - CSS Extraction Options */
+.css-options {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 12px;
+  display: none;
+}
+
+.css-options.show {
+  display: block;
+}
+
+.css-options-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  color: #333;
+}
+
+.css-format-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.format-option {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  text-align: center;
+  font-size: 11px;
+  transition: all 0.2s;
+}
+
+.format-option:hover {
+  border-color: #667eea;
+  background: #f8f9ff;
+}
+
+.format-option.selected {
+  border-color: #667eea;
+  background: #667eea;
+  color: white;
+}
+
+.css-advanced-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.checkbox-option input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+}
+
+/* Loading and error states */
+.loading { 
+  text-align: center; 
+  padding: 64px 20px; 
+  color: #666;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f4f6;
+  border-top: 3px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.error, .success {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+  font-size: 12px;
+}
+
+.error {
+  background: #fee;
+  color: #c33;
+  border: 1px solid #fcc;
+}
+
+.success {
+  background: #efe;
+  color: #363;
+  border: 1px solid #cfc;
+}
+
+/* Modal styles for results */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  border-radius: 12px;
+  width: 95%;
+  max-width: 900px;
+  max-height: 90%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  padding: 20px;
+  border-bottom: 1px solid #e1e8ed;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #666;
+}
+
+.file-tabs {
+  display: flex;
+  border-bottom: 1px solid #e1e8ed;
+  background: #f8f9fa;
+  overflow-x: auto;
+}
+
+.file-tab {
+  padding: 12px 20px;
+  border: none;
+  background: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.file-tab:hover {
+  background: #e9ecef;
+}
+
+.file-tab.active {
+  background: white;
+  border-bottom-color: #667eea;
+  color: #667eea;
+}
+
+.modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.code-preview {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 16px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  max-height: 400px;
+}
+
+/* NEW - Hierarchy visualization */
+.hierarchy-preview {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  padding: 16px;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: pre;
+  overflow-x: auto;
+  max-height: 300px;
+}
+
+/* Export options */
+.export-options {
+  margin-top: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.export-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.export-option {
+  padding: 8px 12px;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  text-align: center;
+  font-size: 11px;
+  transition: all 0.2s;
+}
+
+.export-option:hover {
+  border-color: #667eea;
+  background: #f8f9ff;
+}
+  </style>
 </head>
 <body>
   <div class="app-container">
-    <!-- Header with breadcrumbs and view toggle -->
+    <!-- Header -->
     <div class="header">
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
-          <h1 id="headerTitle">🌉 Figma → React Native Flow Bridge</h1>
+          <h1 id="headerTitle">🌉 Figma → React Native Bridge</h1>
           <div class="breadcrumb" id="breadcrumb">
-            <span class="breadcrumb-item" data-action="showDashboard">Flows</span>
+            <span class="breadcrumb-item">Advanced Design Extraction</span>
           </div>
-        </div>
-        <div class="view-toggle" id="viewToggle" style="display: none;">
-          <button class="toggle-btn active" data-action="setViewMode" data-mode="grid" id="gridViewBtn">
-            📊 Grid View
-          </button>
-          <button class="toggle-btn" data-action="setViewMode" data-mode="diagram" id="diagramViewBtn">
-            🗺️ Flow Diagram
-          </button>
         </div>
       </div>
       <div class="progress-bar" id="globalProgress" style="display: none;">
@@ -33,15 +494,11 @@
     <!-- Main content area -->
     <div class="content" id="mainContent">
       
-      <!-- Initial Dashboard View -->
+      <!-- Dashboard View -->
       <div id="dashboardView" class="dashboard">
         <div class="dashboard-header">
-          <h2 class="dashboard-title">Advanced Flow Detection</h2>
+          <h2 class="dashboard-title">Choose Your Extraction Method</h2>
           <div class="dashboard-stats" id="dashboardStats">
-            <div class="stat-item">
-              <span>🎯</span>
-              <span>Multi-Strategy Detection</span>
-            </div>
             <div class="stat-item" id="selectionStatus">
               <span>📌</span>
               <span>No selection</span>
@@ -49,147 +506,430 @@
           </div>
         </div>
         
-        <div class="button-group">
-          <button class="button" data-action="detectFlows" id="detectFlowsBtn">
-            🔍 Analyze Flows & User Journeys
-          </button>
-          <button class="button secondary" data-action="extractSimpleTokens" id="extractTokensBtn">
-            🎨 Simple Token Extraction
-          </button>
-          <button class="button outline" data-action="refreshSelection" id="refreshSelectionBtn">
-            🔄 Refresh Selection
-          </button>
+        <!-- NEW - Action Grid -->
+        <div class="action-grid">
+          
+          <!-- Hierarchy CSS Extraction Card -->
+          <div class="action-card" data-action="toggleCSSOptions">
+            <div class="action-card-header">
+              <div class="action-icon">🎨</div>
+              <h3 class="action-title">Complete Hierarchy CSS Extraction</h3>
+            </div>
+            <div class="action-description">
+              Extract CSS from ALL layers and sub-items while preserving exact Figma hierarchy. Processes every single element in your selection including all nested children.
+            </div>
+            <div class="action-features">
+              <span class="feature-tag">Complete hierarchy</span>
+              <span class="feature-tag">All child nodes</span>
+              <span class="feature-tag">Multiple formats</span>
+              <span class="feature-tag">Auto class names</span>
+            </div>
+            
+            <!-- CSS Options Panel -->
+            <div class="css-options" id="cssOptions">
+              <div class="css-options-title">🎯 CSS Extraction Options</div>
+              
+              <div class="css-format-options">
+                <div class="format-option selected" data-format="all">
+                  🌟 All Formats
+                </div>
+                <div class="format-option" data-format="scss">
+                  🎨 SCSS Only
+                </div>
+                <div class="format-option" data-format="react-native">
+                  📱 React Native
+                </div>
+                <div class="format-option" data-format="css">
+                  📄 CSS Only
+                </div>
+              </div>
+              
+              <div class="css-advanced-options">
+                <label class="checkbox-option">
+                  <input type="checkbox" id="preservePositioning" checked>
+                  <span>Preserve absolute positioning</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" id="includeHidden">
+                  <span>Include hidden layers</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" id="semanticNames" checked>
+                  <span>Generate semantic class names</span>
+                </label>
+                <label class="checkbox-option">
+                  <input type="checkbox" id="responsiveTokens" checked>
+                  <span>Create responsive design tokens</span>
+                </label>
+              </div>
+            </div>
+            
+            <button class="action-button" data-action="extractHierarchyCSS">
+              🚀 Extract Complete Hierarchy CSS
+            </button>
+          </div>
+          
         </div>
         
-        <div id="flowsContainer" style="display: none;">
-          <div class="flows-grid" id="flowsGrid">
-            <!-- Flow cards will be populated here -->
-          </div>
-        </div>
-        
-        <div class="empty-state" id="emptyState">
-          <div class="empty-state-icon">🎯</div>
-          <div class="empty-state-title">Ready to Detect Flows</div>
-          <div class="empty-state-description">
-            Analyze your Figma design to automatically detect user flows, roles, and generate production-ready React Native code with advanced design systems.
-          </div>
-        </div>
+        <!-- Status Messages -->
+        <div id="statusMessage"></div>
       </div>
       
-      <!-- Flow Detail View -->
-      <div id="flowDetailView" class="flow-detail" style="display: none;">
-        <div class="back-button" data-action="showDashboard">
-          ← Back to Flows
-        </div>
-        
-        <div class="flow-detail-header" id="flowDetailHeader">
-          <!-- Flow details will be populated here -->
-        </div>
-        
-        <!-- Flow Diagram View -->
-        <div id="flowDiagramSection" class="flow-diagram-container" style="display: none;">
-          <h3 style="margin: 0 0 16px 0; font-size: 14px; font-weight: 600;">Flow Diagram</h3>
-          <div class="flow-diagram" id="flowDiagram">
-            <!-- Flow diagram will be generated here -->
-          </div>
-        </div>
-        
-        <!-- Screens Section -->
-        <div class="screens-section">
-          <div class="screens-header">
-            <h3 class="screens-title">Screens in Flow</h3>
-            <span id="screenCount" class="badge"></span>
-          </div>
-          <div class="screens-grid" id="screensGrid">
-            <!-- Screen cards will be populated here -->
-          </div>
-        </div>
-        
-        <!-- Enhanced Generation Options -->
-        <div class="generation-options">
-          <div class="generation-title">🚀 Code Generation Options</div>
-          <div class="option-grid" id="generationOptions">
-            <div class="option-card selected" data-option="complete-flow">
-              <div class="option-title">📱 Complete Flow Package</div>
-              <div class="option-description">Navigation + Screens + Theme + Types</div>
-            </div>
-            <div class="option-card" data-option="individual-screen">
-              <div class="option-title">🎨 Individual Screen</div>
-              <div class="option-description">Single screen component with styling</div>
-            </div>
-            <div class="option-card" data-option="theme-only">
-              <div class="option-title">🎨 Flow Theme</div>
-              <div class="option-description">Design tokens and theme file</div>
-            </div>
-            <div class="option-card" data-option="project-structure">
-              <div class="option-title">📁 Project Structure</div>
-              <div class="option-description">Complete folder structure with files</div>
-            </div>
-          </div>
-        </div>
-        
-        <div class="action-bar">
-          <div class="button-group">
-            <button class="button success" data-action="generateSelectedOption" id="generateSelectedBtn">
-              🚀 Generate Selected
-            </button>
-            <button class="button secondary" data-action="generateScreenCode" id="generateScreenBtn" disabled>
-              🎨 Generate Selected Screen
-            </button>
-            <button class="button outline" data-action="exportFlowTheme" id="exportThemeBtn">
-              📦 Download Package
-            </button>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Loading State -->
+      <!-- Loading View -->
       <div id="loadingView" class="loading" style="display: none;">
         <div class="loading-spinner"></div>
-        <div id="loadingMessage">Analyzing your design flows...</div>
+        <div id="loadingMessage">Processing your Figma design...</div>
+        <div id="loadingProgress" style="margin-top: 12px; font-size: 11px; color: #888;"></div>
       </div>
-      
     </div>
-    
-    <!-- Error and Success Messages -->
-    <div id="errorMessage" class="error" style="display: none;"></div>
-    <div id="successMessage" class="success" style="display: none;"></div>
   </div>
   
-  <!-- Enhanced Code Preview Modal with Multi-file Support -->
-  <div id="codeModal" class="modal-overlay">
+  <!-- Results Modal -->
+  <div class="modal-overlay" id="resultsModal">
     <div class="modal">
       <div class="modal-header">
-        <h3 class="modal-title" id="modalTitle">Generated Code Package</h3>
-        <button class="modal-close" data-action="closeCodeModal">&times;</button>
+        <h3 class="modal-title" id="modalTitle">Complete Hierarchy Extraction Results</h3>
+        <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
+      
+      <!-- File tabs -->
       <div class="file-tabs" id="fileTabs">
-        <!-- File tabs will be populated here -->
+        <!-- Tabs will be populated dynamically -->
       </div>
+      
       <div class="modal-body">
-        <div class="code-preview" id="codePreview"></div>
+        <!-- File content will be displayed here -->
+        <div id="fileContent"></div>
         
+        <!-- Hierarchy preview for CSS extraction -->
+        <div id="hierarchyPreview" style="display: none;">
+          <h4>📁 Complete Layer Hierarchy</h4>
+          <div class="hierarchy-preview" id="hierarchyVisualization"></div>
+        </div>
+        
+        <!-- Export options -->
         <div class="export-options">
-          <div class="export-title">📦 Export Options</div>
-          <div class="export-grid">
-            <div class="export-option" data-action="copyCode">
-              📋 Copy Current File
-            </div>
-            <div class="export-option" data-action="downloadCurrentFile">
-              💾 Download File
-            </div>
-            <div class="export-option" data-action="downloadAllFiles">
-              📁 Download All (.zip)
-            </div>
-            <div class="export-option" data-action="copyPackageStructure">
-              📦 Copy Project Structure
-            </div>
+          <div class="export-title">📥 Download Options</div>
+          <div class="export-grid" id="exportGrid">
+            <!-- Export options will be populated dynamically -->
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="script.js"></script>
+  <script>
+    // Global state
+    let currentExtractionData = null;
+    let selectedFormat = 'all';
+    let activeFileTab = null;
+
+    // Initialize the plugin
+    document.addEventListener('DOMContentLoaded', function() {
+      updateSelectionStatus();
+      setupEventListeners();
+      
+      // Check for any pending operations
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'PLUGIN_READY',
+          timestamp: Date.now()
+        } 
+      }, '*');
+    });
+
+    function setupEventListeners() {
+      // Action card clicks
+      document.querySelectorAll('.action-card').forEach(card => {
+        card.addEventListener('click', function(e) {
+          const action = this.getAttribute('data-action');
+          if (action === 'toggleCSSOptions') {
+            toggleCSSOptions();
+          }
+        });
+      });
+
+      // Action button clicks
+      document.querySelectorAll('.action-button').forEach(button => {
+        button.addEventListener('click', function(e) {
+          e.stopPropagation();
+          const action = this.getAttribute('data-action');
+          handleAction(action);
+        });
+      });
+
+      // CSS format selection
+      document.querySelectorAll('.format-option').forEach(option => {
+        option.addEventListener('click', function(e) {
+          e.stopPropagation();
+          selectFormat(this.getAttribute('data-format'));
+        });
+      });
+
+      // Listen for messages from plugin
+      window.addEventListener('message', function(event) {
+        const { type, data } = event.data.pluginMessage || {};
+        
+        switch (type) {
+          case 'SELECTION_CHANGED':
+            updateSelectionStatus(data);
+            break;
+          case 'PROGRESS_UPDATE':
+            updateProgress(data);
+            break;
+          case 'EXTRACTION_COMPLETE':
+            handleExtractionComplete(data);
+            break;
+          case 'ERROR':
+            showError(data.message);
+            break;
+          case 'SUCCESS':
+            showSuccess(data.message);
+            break;
+        }
+      });
+    }
+
+    function toggleCSSOptions() {
+      const options = document.getElementById('cssOptions');
+      options.classList.toggle('show');
+    }
+
+    function selectFormat(format) {
+      selectedFormat = format;
+      
+      // Update UI
+      document.querySelectorAll('.format-option').forEach(option => {
+        option.classList.remove('selected');
+      });
+      document.querySelector(`[data-format="${format}"]`).classList.add('selected');
+    }
+
+    function handleAction(action) {
+      clearMessages();
+      
+      switch (action) {
+        case 'extractHierarchyCSS':
+          extractHierarchyCSS();
+          break;
+      }
+    }
+
+    function extractHierarchyCSS() {
+      const options = {
+        format: selectedFormat,
+        preserveAbsolutePositioning: document.getElementById('preservePositioning').checked,
+        includeHiddenLayers: document.getElementById('includeHidden').checked,
+        generateClassNames: document.getElementById('semanticNames').checked ? 'semantic' : 'minimal',
+        responsiveTokens: document.getElementById('responsiveTokens').checked
+      };
+
+      showLoading('🎨 Extracting CSS from complete Figma hierarchy...');
+      
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'EXTRACT_HIERARCHY_CSS',
+          options: options,
+          timestamp: Date.now()
+        } 
+      }, '*');
+    }
+
+    function updateSelectionStatus(data) {
+      const statusElement = document.getElementById('selectionStatus');
+      
+      if (data && data.count > 0) {
+        const frameText = data.hasFrames ? 'with frames' : 'no frames';
+        statusElement.innerHTML = `
+          <span>📌</span>
+          <span>${data.count} selected (${frameText})</span>
+        `;
+      } else {
+        statusElement.innerHTML = `
+          <span>📌</span>
+          <span>No selection (will use all frames)</span>
+        `;
+      }
+    }
+
+    function showLoading(message) {
+      document.getElementById('dashboardView').style.display = 'none';
+      document.getElementById('loadingView').style.display = 'block';
+      document.getElementById('loadingMessage').textContent = message;
+      
+      // Show global progress
+      const progressBar = document.getElementById('globalProgress');
+      progressBar.style.display = 'block';
+      updateGlobalProgress(0);
+    }
+
+    function hideLoading() {
+      document.getElementById('loadingView').style.display = 'none';
+      document.getElementById('dashboardView').style.display = 'block';
+      document.getElementById('globalProgress').style.display = 'none';
+    }
+
+    function updateProgress(data) {
+      const { progress, message } = data;
+      document.getElementById('loadingProgress').textContent = message;
+      updateGlobalProgress(progress);
+    }
+
+    function updateGlobalProgress(progress) {
+      const fill = document.getElementById('globalProgressFill');
+      fill.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+    }
+
+    function handleExtractionComplete(data) {
+      hideLoading();
+      currentExtractionData = data;
+      
+      if (data.files) {
+        showResultsModal(data);
+      } else {
+        showSuccess('Complete hierarchy extraction completed successfully!');
+      }
+    }
+
+    function showResultsModal(data) {
+      const modal = document.getElementById('resultsModal');
+      const modalTitle = document.getElementById('modalTitle');
+      const fileTabs = document.getElementById('fileTabs');
+      const fileContent = document.getElementById('fileContent');
+      const exportGrid = document.getElementById('exportGrid');
+      
+      // Set modal title
+      modalTitle.textContent = `🎨 Complete Hierarchy CSS Results (${data.totalNodes || 0} nodes)`;
+      
+      // Show hierarchy preview
+      if (data.visualHierarchy) {
+        const hierarchyPreview = document.getElementById('hierarchyPreview');
+        const hierarchyViz = document.getElementById('hierarchyVisualization');
+        hierarchyPreview.style.display = 'block';
+        hierarchyViz.textContent = data.visualHierarchy;
+      }
+      
+      // Create file tabs
+      fileTabs.innerHTML = '';
+      const fileNames = Object.keys(data.files);
+      
+      fileNames.forEach((fileName, index) => {
+        const tab = document.createElement('button');
+        tab.className = `file-tab ${index === 0 ? 'active' : ''}`;
+        tab.textContent = fileName;
+        tab.onclick = () => showFileContent(fileName, data.files[fileName]);
+        fileTabs.appendChild(tab);
+      });
+      
+      // Show first file by default
+      if (fileNames.length > 0) {
+        showFileContent(fileNames[0], data.files[fileNames[0]]);
+      }
+      
+      // Create export options
+      exportGrid.innerHTML = '';
+      fileNames.forEach(fileName => {
+        const exportOption = document.createElement('div');
+        exportOption.className = 'export-option';
+        exportOption.textContent = `📥 ${fileName}`;
+        exportOption.onclick = () => downloadFile(fileName, data.files[fileName]);
+        exportGrid.appendChild(exportOption);
+      });
+      
+      // Add "Download All" option
+      const downloadAllOption = document.createElement('div');
+      downloadAllOption.className = 'export-option';
+      downloadAllOption.textContent = '📦 Download All Files';
+      downloadAllOption.style.gridColumn = '1 / -1';
+      downloadAllOption.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      downloadAllOption.style.color = 'white';
+      downloadAllOption.onclick = () => downloadAllFiles(data.files);
+      exportGrid.appendChild(downloadAllOption);
+      
+      // Show modal
+      modal.style.display = 'flex';
+    }
+
+    function showFileContent(fileName, content) {
+      // Update active tab
+      document.querySelectorAll('.file-tab').forEach(tab => {
+        tab.classList.remove('active');
+      });
+      event.target.classList.add('active');
+      
+      // Show content
+      const fileContent = document.getElementById('fileContent');
+      fileContent.innerHTML = `
+        <h4>📄 ${fileName}</h4>
+        <div class="code-preview">${escapeHtml(content)}</div>
+      `;
+      
+      activeFileTab = fileName;
+    }
+
+    function downloadFile(fileName, content) {
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      showSuccess(`Downloaded ${fileName}`);
+    }
+
+    function downloadAllFiles(files) {
+      // Create a simple archive by concatenating files with separators
+      let archive = '';
+      Object.entries(files).forEach(([fileName, content]) => {
+        archive += `\n\n=== ${fileName} ===\n\n${content}`;
+      });
+      
+      downloadFile('figma-complete-hierarchy-extraction.txt', archive);
+    }
+
+    function closeModal() {
+      document.getElementById('resultsModal').style.display = 'none';
+      document.getElementById('hierarchyPreview').style.display = 'none';
+    }
+
+    function showError(message) {
+      const statusMessage = document.getElementById('statusMessage');
+      statusMessage.innerHTML = `<div class="error">❌ ${message}</div>`;
+      hideLoading();
+    }
+
+    function showSuccess(message) {
+      const statusMessage = document.getElementById('statusMessage');
+      statusMessage.innerHTML = `<div class="success">✅ ${message}</div>`;
+    }
+
+    function clearMessages() {
+      document.getElementById('statusMessage').innerHTML = '';
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Auto-hide messages after 5 seconds
+    let messageTimeout;
+    function showTimedMessage(message, type = 'success') {
+      clearTimeout(messageTimeout);
+      
+      if (type === 'success') {
+        showSuccess(message);
+      } else {
+        showError(message);
+      }
+      
+      messageTimeout = setTimeout(() => {
+        clearMessages();
+      }, 5000);
+    }
+  </script>
 </body>
 </html>

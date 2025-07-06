@@ -1,5 +1,6 @@
 // Figma Plugin Main Entry Point
 // Updated to use the comprehensive architecture modules with proper constants
+// FIXED: Component detection result assignment
 
 // Import the actual handlers and utilities from your architecture
 import FlowDetector from './detectors/flow-detector';
@@ -30,7 +31,11 @@ import {
   FlowStructure, 
   ExtractedValues,
   PluginUIMessage,
-  SelectionValidation 
+  SelectionValidation,
+  ScreenStructure,
+  ComponentDetectionResult,
+  DeviceType,
+  ErrorMessage
 } from './core/types';
 
 // Initialize logger
@@ -103,7 +108,7 @@ function showPluginUI() {
       function: 'showPluginUI',
       operation: 'UI initialization'
     });
-    logger.error(MODULE_NAME, 'showPluginUI', 'Error showing UI:', { error: errorInfo });
+    logger.error(MODULE_NAME, 'showPluginUI', `Error showing UI: ${errorInfo}`);
     figma.closePlugin(`UI Error: ${errorInfo}`);
   }
 }
@@ -119,10 +124,7 @@ figma.ui.onmessage = async (msg) => {
   
   if (pluginState.isProcessing && ![UI_MESSAGE_TYPES.CLOSE_PLUGIN, UI_MESSAGE_TYPES.CANCEL_OPERATION].includes(msg.type)) {
     logger.warn(MODULE_NAME, 'onmessage', 'Operation in progress, ignoring request');
-    sendMessageToUI({
-      type: MESSAGE_TYPES.ERROR,
-      error: 'Another operation is in progress. Please wait.'
-    });
+    sendErrorToUI('Another operation is in progress. Please wait.');
     return;
   }
   
@@ -178,10 +180,7 @@ figma.ui.onmessage = async (msg) => {
         
       default:
         logger.warn(MODULE_NAME, 'onmessage', 'Unknown message type:', msg.type);
-        sendMessageToUI({
-          type: MESSAGE_TYPES.ERROR,
-          error: `Unknown message type: ${msg.type}`
-        });
+        sendErrorToUI(`Unknown message type: ${msg.type}`);
     }
   } catch (error) {
     const errorInfo = ErrorHandler.handle(error as Error, {
@@ -189,12 +188,9 @@ figma.ui.onmessage = async (msg) => {
       function: 'messageHandler',
       operation: 'message handling'
     });
-    logger.error(MODULE_NAME, 'onmessage', 'Error handling message:', { error: errorInfo });
+    logger.error(MODULE_NAME, 'onmessage', `Error handling message: ${errorInfo}`);
     pluginState.isProcessing = false;
-    sendMessageToUI({
-      type: MESSAGE_TYPES.ERROR,
-      error: `Handler error: ${errorInfo}`
-    });
+    sendErrorToUI(`Handler error: ${errorInfo}`);
   }
 };
 
@@ -217,20 +213,23 @@ async function handleDetectFlowsWithArchitecture() {
 
     sendProgress(40, 'Using ComponentDetector for semantic analysis...');
 
-    // Enhance with component detection
+    // FIXED: Enhance with component detection
     const enhancedFlows = await Promise.all(
       flowExtractionResult.flows.map(async (flow) => {
         const enhancedScreens = await Promise.all(
           flow.screens.map(async (screen) => {
-            const components = componentDetector.detectComponentType(screen);
-            const deviceType = deviceDetector.detectDevice(screen.width, screen.height);
+            // Get component detection result
+            const componentAnalysis = componentDetector.detectComponentType(screen);
+            const deviceDetectionResult = deviceDetector.detectDevice(screen.width, screen.height);
             
-            return {
+            // Create enhanced screen with proper typing
+            const enhancedScreen: ScreenStructure = {
               ...screen,
-              components,
-              deviceType: deviceType.deviceType,
-              semanticAnalysis: components
+              deviceType: deviceDetectionResult.deviceType,
+              semanticAnalysis: componentAnalysis
             };
+
+            return enhancedScreen;
           })
         );
 
@@ -275,11 +274,8 @@ async function handleDetectFlowsWithArchitecture() {
       function: 'handleDetectFlowsWithArchitecture',
       operation: 'flow detection'
     });
-    logger.error(MODULE_NAME, 'handleDetectFlowsWithArchitecture', 'Error in flow detection:', { error: errorInfo });
-    sendMessageToUI({
-      type: MESSAGE_TYPES.ERROR,
-      error: `Flow detection failed: ${errorInfo}`
-    });
+    logger.error(MODULE_NAME, 'handleDetectFlowsWithArchitecture', `Error in flow detection: ${errorInfo}`);
+    sendErrorToUI(`Flow detection failed: ${errorInfo}`);
   } finally {
     pluginState.isProcessing = false;
   }
@@ -325,11 +321,8 @@ async function handleExtractTokensWithArchitecture() {
       function: 'handleExtractTokensWithArchitecture',
       operation: 'token extraction'
     });
-    logger.error(MODULE_NAME, 'handleExtractTokensWithArchitecture', 'Error in token extraction:', { error: errorInfo });
-    sendMessageToUI({
-      type: MESSAGE_TYPES.ERROR,
-      error: `Token extraction failed: ${errorInfo}`
-    });
+    logger.error(MODULE_NAME, 'handleExtractTokensWithArchitecture', `Error in token extraction: ${errorInfo}`);
+    sendErrorToUI(`Token extraction failed: ${errorInfo}`);
   } finally {
     pluginState.isProcessing = false;
   }
@@ -397,11 +390,8 @@ async function handleGenerateFlowCodeWithArchitecture(msg: any) {
       function: 'handleGenerateFlowCodeWithArchitecture',
       operation: 'code generation'
     });
-    logger.error(MODULE_NAME, 'handleGenerateFlowCodeWithArchitecture', 'Error in code generation:', { error: errorInfo });
-    sendMessageToUI({
-      type: MESSAGE_TYPES.ERROR,
-      error: `Code generation failed: ${errorInfo}`
-    });
+    logger.error(MODULE_NAME, 'handleGenerateFlowCodeWithArchitecture', `Error in code generation: ${errorInfo}`);
+    sendErrorToUI(`Code generation failed: ${errorInfo}`);
   } finally {
     pluginState.isProcessing = false;
   }
@@ -461,10 +451,7 @@ async function handleGenerateScreenCodeWithArchitecture(msg: any) {
       function: 'handleGenerateScreenCodeWithArchitecture',
       operation: 'screen generation'
     });
-    sendMessageToUI({
-      type: MESSAGE_TYPES.ERROR,
-      error: `Screen generation failed: ${errorInfo}`
-    });
+    sendErrorToUI(`Screen generation failed: ${errorInfo}`);
   } finally {
     pluginState.isProcessing = false;
   }
@@ -500,10 +487,7 @@ async function handleExportFlowThemeWithArchitecture(msg: any) {
       function: 'handleExportFlowThemeWithArchitecture',
       operation: 'theme export'
     });
-    sendMessageToUI({
-      type: MESSAGE_TYPES.ERROR,
-      error: `Theme export failed: ${errorInfo}`
-    });
+    sendErrorToUI(`Theme export failed: ${errorInfo}`);
   } finally {
     pluginState.isProcessing = false;
   }
@@ -553,10 +537,7 @@ async function handleGenerateProjectStructureWithArchitecture(msg: any) {
       function: 'handleGenerateProjectStructureWithArchitecture',
       operation: 'project structure generation'
     });
-    sendMessageToUI({
-      type: MESSAGE_TYPES.ERROR,
-      error: `Project structure generation failed: ${errorInfo}`
-    });
+    sendErrorToUI(`Project structure generation failed: ${errorInfo}`);
   } finally {
     pluginState.isProcessing = false;
   }
@@ -569,6 +550,14 @@ function sendMessageToUI(message: any) {
   } catch (error) {
     logger.error(MODULE_NAME, 'sendMessageToUI', 'Error sending message to UI:', error as Error);
   }
+}
+
+function sendErrorToUI(errorMessage: string) {
+  const errorMsg: ErrorMessage = {
+    type: 'error',
+    error: errorMessage
+  };
+  sendMessageToUI(errorMsg);
 }
 
 function sendProgress(progress: number, message: string) {
@@ -674,6 +663,6 @@ try {
     function: 'initialization',
     operation: 'plugin startup'
   });
-  logger.error(MODULE_NAME, 'init', 'Critical error during plugin initialization:', { error: errorInfo });
+      logger.error(MODULE_NAME, 'init', `Critical error during plugin initialization: ${errorInfo}`);
   figma.closePlugin(`Initialization error: ${errorInfo}`);
 }
