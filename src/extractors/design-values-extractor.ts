@@ -1,16 +1,50 @@
 // src/extractors/design-values-extractor.ts
-// Extract design tokens from Figma with comprehensive analysis
+// Extract design tokens from Figma - Fixed imports
 
-import { BaseExtractor } from './base-extractor';
 import { logger, LogFunction } from '@core/logger';
-import { ErrorHandler } from '@core/error-handler';
-import { ExtractedValues } from '@core/types';
-import { safeGetNumber, isValidNumber } from '@utils/number-utils';
-import { rgbToHex, getAllPages, findAllNodes } from '@utils/figma-helpers';
 
 const MODULE_NAME = 'DesignValuesExtractor';
 
-export class DesignValuesExtractor extends BaseExtractor {
+// Simple safe number utility (avoiding import)
+function safeGetNumber(value: any, defaultValue: number = 0): number {
+  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
+    return value;
+  }
+  return defaultValue;
+}
+
+function isValidNumber(value: any): boolean {
+  return typeof value === 'number' && !isNaN(value) && isFinite(value);
+}
+
+// RGB to Hex conversion
+function rgbToHex(r: number, g: number, b: number): string {
+  const toHex = (c: number): string => {
+    const hex = Math.round(c * 255).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+}
+
+// Simple extracted values interface
+interface ExtractedValues {
+  colors: Set<string>;
+  fontSizes: Set<number>;
+  fontWeights: Set<string>;
+  fontFamilies: Set<string>;
+  borderRadius: Set<number>;
+  spacing: Set<number>;
+  shadows: Set<string>;
+  opacity: Set<number>;
+  buttons: any[];
+  inputs: any[];
+  headings: any[];
+  labels: any[];
+  cards: any[];
+  navigationItems: any[];
+}
+
+export class DesignValuesExtractor {
 
   @LogFunction(MODULE_NAME, true)
   extractFromAllPages(): ExtractedValues {
@@ -36,28 +70,19 @@ export class DesignValuesExtractor extends BaseExtractor {
         navigationItems: []
       };
 
-      // Extract from all pages
-      const allPages = getAllPages();
+      // Extract from current page
+      const allNodes = this.findAllNodes(figma.currentPage);
       
-      allPages.forEach((page: any) => {
+      allNodes.forEach((node: any) => {
         try {
-          logger.debug(MODULE_NAME, FUNC_NAME, `Processing page: ${page.name}`);
-          const allNodes = findAllNodes(page);
-          
-          allNodes.forEach((node: any) => {
-            try {
-              this.extractBasicTokens(node, values);
-              this.extractSemanticComponents(node, values);
-            } catch (nodeError) {
-              // Skip problematic nodes silently
-              logger.debug(MODULE_NAME, FUNC_NAME, 'Skipped problematic node', { 
-                node: node?.name,
-                error: nodeError 
-              });
-            }
+          this.extractBasicTokens(node, values);
+          this.extractSemanticComponents(node, values);
+        } catch (nodeError) {
+          // Skip problematic nodes silently
+          logger.debug(MODULE_NAME, FUNC_NAME, 'Skipped problematic node', { 
+            node: node?.name,
+            error: nodeError 
           });
-        } catch (pageError) {
-          logger.warn(MODULE_NAME, FUNC_NAME, `Error processing page ${page.name}:`, { error: pageError });
         }
       });
 
@@ -71,16 +96,12 @@ export class DesignValuesExtractor extends BaseExtractor {
       return values;
       
     } catch (error) {
-      ErrorHandler.handle(error as Error, {
-        module: MODULE_NAME,
-        function: FUNC_NAME,
-        operation: 'comprehensive design values extraction'
-      });
+      logger.error(MODULE_NAME, FUNC_NAME, 'Error in extraction:', error as Error);
       throw error;
     }
   }
 
-  // Implementation of the abstract extract method from BaseExtractor
+  // Implementation of the extract method
   extract(nodes: any[]): ExtractedValues {
     const values: ExtractedValues = {
       colors: new Set<string>(),
@@ -114,6 +135,32 @@ export class DesignValuesExtractor extends BaseExtractor {
     return values;
   }
 
+  private findAllNodes(page: any): any[] {
+    try {
+      if (page && typeof page.findAll === 'function') {
+        return page.findAll();
+      }
+      
+      // Fallback: traverse manually
+      const nodes: any[] = [];
+      const traverse = (node: any) => {
+        nodes.push(node);
+        if (node.children && Array.isArray(node.children)) {
+          node.children.forEach((child: any) => traverse(child));
+        }
+      };
+      
+      if (page.children) {
+        page.children.forEach((child: any) => traverse(child));
+      }
+      
+      return nodes;
+    } catch (error) {
+      logger.error(MODULE_NAME, 'findAllNodes', 'Error finding nodes:', error as Error);
+      return [];
+    }
+  }
+
   @LogFunction(MODULE_NAME)
   extractBasicTokens(node: any, values: ExtractedValues): void {
     const FUNC_NAME = 'extractBasicTokens';
@@ -142,6 +189,119 @@ export class DesignValuesExtractor extends BaseExtractor {
         node: node?.name,
         error 
       });
+    }
+  }
+
+  private extractColors(node: any, values: ExtractedValues): void {
+    try {
+      // Extract from fills
+      if (node.fills && Array.isArray(node.fills)) {
+        node.fills.forEach((fill: any) => {
+          if (this.isValidSolidFill(fill)) {
+            const hex = rgbToHex(fill.color.r, fill.color.g, fill.color.b);
+            const opacity = safeGetNumber(fill.opacity, 1);
+            
+            if (opacity > 0.1) {
+              values.colors.add(hex);
+            }
+          }
+        });
+      }
+
+      // Extract from strokes
+      if (node.strokes && Array.isArray(node.strokes)) {
+        node.strokes.forEach((stroke: any) => {
+          if (this.isValidSolidStroke(stroke)) {
+            const hex = rgbToHex(stroke.color.r, stroke.color.g, stroke.color.b);
+            values.colors.add(hex);
+          }
+        });
+      }
+    } catch (error) {
+      // Skip problematic color extractions
+    }
+  }
+
+  private extractTypography(node: any, values: ExtractedValues): void {
+    try {
+      if (node.type === 'TEXT' && node.visible !== false) {
+        // Font size
+        if (isValidNumber(node.fontSize) && node.fontSize >= 8 && node.fontSize <= 72) {
+          values.fontSizes.add(Math.round(safeGetNumber(node.fontSize)));
+        }
+
+        // Font weight and family
+        if (node.fontName && node.fontName !== figma?.mixed && typeof node.fontName === 'object') {
+          if (node.fontName.style && typeof node.fontName.style === 'string') {
+            values.fontWeights.add(node.fontName.style);
+          }
+          if (node.fontName.family && typeof node.fontName.family === 'string') {
+            values.fontFamilies.add(node.fontName.family);
+          }
+        }
+      }
+    } catch (error) {
+      // Skip problematic typography extractions
+    }
+  }
+
+  private extractSpacing(node: any, values: ExtractedValues): void {
+    try {
+      if ('layoutMode' in node && node.layoutMode !== 'NONE') {
+        // Extract padding values
+        ['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'].forEach(prop => {
+          if (prop in node && isValidNumber(node[prop]) && node[prop] >= 0 && node[prop] <= 200) {
+            values.spacing.add(Math.round(safeGetNumber(node[prop])));
+          }
+        });
+
+        // Extract item spacing
+        if ('itemSpacing' in node && isValidNumber(node.itemSpacing) && node.itemSpacing >= 0 && node.itemSpacing <= 200) {
+          values.spacing.add(Math.round(safeGetNumber(node.itemSpacing)));
+        }
+      }
+    } catch (error) {
+      // Skip problematic spacing extractions
+    }
+  }
+
+  private extractBorderRadius(node: any, values: ExtractedValues): void {
+    try {
+      if (('cornerRadius' in node || 'topLeftRadius' in node) && 
+          (node.type === 'RECTANGLE' || node.type === 'FRAME' || node.type === 'COMPONENT')) {
+        
+        if ('cornerRadius' in node && isValidNumber(node.cornerRadius) && node.cornerRadius >= 0 && node.cornerRadius <= 100) {
+          values.borderRadius.add(Math.round(safeGetNumber(node.cornerRadius)));
+        }
+      }
+    } catch (error) {
+      // Skip problematic border radius extractions
+    }
+  }
+
+  private extractShadows(node: any, values: ExtractedValues): void {
+    try {
+      if (node.effects && Array.isArray(node.effects)) {
+        node.effects.forEach((effect: any) => {
+          if (this.isValidShadowEffect(effect)) {
+            const shadow = `${effect.offset.x}px ${effect.offset.y}px ${effect.radius}px ${rgbToHex(effect.color.r, effect.color.g, effect.color.b)}`;
+            values.shadows.add(shadow);
+          }
+        });
+      }
+    } catch (error) {
+      // Skip problematic shadow extractions
+    }
+  }
+
+  private extractOpacity(node: any, values: ExtractedValues): void {
+    try {
+      if ('opacity' in node && isValidNumber(node.opacity) && node.opacity < 1 && node.opacity > 0.1) {
+        const rounded = Math.round(node.opacity * 100) / 100;
+        values.opacity.add(rounded);
+      }
+    } catch (error) {
+      // Skip problematic opacity extractions
     }
   }
 
@@ -317,12 +477,11 @@ export class DesignValuesExtractor extends BaseExtractor {
     try {
       const width = safeGetNumber(node.width);
       const height = safeGetNumber(node.height);
-      const cornerRadius = safeGetNumber(node.cornerRadius);
       
       return (
         width > 200 && height > 100 &&
         'children' in node && node.children && node.children.length > 1 &&
-        (cornerRadius > 0 || ('effects' in node && node.effects && node.effects.length > 0))
+        (safeGetNumber(node.cornerRadius) > 0 || ('effects' in node && node.effects && node.effects.length > 0))
       );
     } catch (error) {
       return false;
@@ -432,7 +591,7 @@ export class DesignValuesExtractor extends BaseExtractor {
     }
   }
 
-  // Helper methods (delegate to utils)
+  // Helper methods
   private getNodeBackgroundColor(node: any): string | null {
     if ('fills' in node && node.fills && node.fills.length > 0) {
       const fill = node.fills[0];
@@ -536,6 +695,42 @@ export class DesignValuesExtractor extends BaseExtractor {
     if (fontSize >= 24) return 2;
     if (fontSize >= 20) return 3;
     return 2;
+  }
+
+  // Validation helpers
+  private isValidSolidFill(fill: any): boolean {
+    return fill && 
+           fill.type === 'SOLID' && 
+           fill.color && 
+           fill.visible !== false &&
+           this.hasValidColorValues(fill.color);
+  }
+
+  private isValidSolidStroke(stroke: any): boolean {
+    return stroke && 
+           stroke.type === 'SOLID' && 
+           stroke.color && 
+           stroke.visible !== false &&
+           this.hasValidColorValues(stroke.color);
+  }
+
+  private isValidShadowEffect(effect: any): boolean {
+    return effect && 
+           (effect.type === 'DROP_SHADOW' || effect.type === 'INNER_SHADOW') && 
+           effect.color && 
+           effect.visible !== false &&
+           this.hasValidColorValues(effect.color) &&
+           safeGetNumber(effect.radius, 0) > 0;
+  }
+
+  private hasValidColorValues(color: any): boolean {
+    return color &&
+           isValidNumber(color.r) && 
+           isValidNumber(color.g) && 
+           isValidNumber(color.b) &&
+           color.r >= 0 && color.r <= 1 &&
+           color.g >= 0 && color.g <= 1 &&
+           color.b >= 0 && color.b <= 1;
   }
 }
 

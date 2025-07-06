@@ -1,11 +1,40 @@
 // src/generators/theme-generator.ts
-// Fixed theme generator with proper TypeScript and improved output
+// Fixed theme generator - removed problematic imports
 
 import { logger, LogFunction } from '@core/logger';
-import { ErrorHandler } from '@core/error-handler';
-import { ExtractedValues, ThemeTokens } from '@core/types';
 
 const MODULE_NAME = 'ThemeGenerator';
+
+// Simple interfaces to avoid import issues
+interface ExtractedValues {
+  colors: Set<string>;
+  fontSizes: Set<number>;
+  fontWeights: Set<string>;
+  fontFamilies: Set<string>;
+  borderRadius: Set<number>;
+  spacing: Set<number>;
+  shadows: Set<string>;
+  opacity: Set<number>;
+  buttons: any[];
+  inputs: any[];
+  headings: any[];
+  labels: any[];
+  cards: any[];
+  navigationItems: any[];
+}
+
+interface ThemeTokens {
+  colors: Record<string, string>;
+  typography: {
+    fontSize: Record<string, number>;
+    fontWeight: Record<string, string>;
+  };
+  spacing: Record<string, number>;
+  borderRadius: Record<string, number>;
+  shadows: Record<string, string>;
+  opacity: Record<string, number>;
+  components?: any;
+}
 
 export class ThemeGenerator {
 
@@ -33,11 +62,7 @@ export class ThemeGenerator {
 
       return theme;
     } catch (error) {
-      ErrorHandler.handle(error as Error, {
-        module: MODULE_NAME,
-        function: 'generateTheme',
-        operation: 'theme generation'
-      });
+      logger.error(MODULE_NAME, 'generateTheme', 'Error generating theme:', error as Error);
       
       // Return minimal theme on error
       return this.createMinimalTheme();
@@ -105,36 +130,6 @@ export const theme = {
   opacity: (level: string) => OPACITY[level as keyof typeof OPACITY] || 1,
 };
 
-// 🎨 DESIGN SYSTEM USAGE EXAMPLES
-/*
-// Using colors
-<View style={{ backgroundColor: theme.color('primary') }} />
-
-// Using typography
-<Text style={{
-  fontSize: theme.fontSize('lg'),
-  fontWeight: theme.fontWeight('bold'),
-  color: theme.color('dark1')
-}}>
-  Heading
-</Text>
-
-// Using responsive spacing
-<View style={{ 
-  padding: responsive.space(16),
-  borderRadius: responsive.radius(8),
-  margin: responsive.space(12)
-}} />
-
-// Using shadows
-<View style={{
-  ...Platform.select({
-    ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-    android: { elevation: 4 }
-  })
-}} />
-*/
-
 export default {
   COLORS,
   TYPOGRAPHY,
@@ -153,11 +148,7 @@ export default {
 
       return content;
     } catch (error) {
-      ErrorHandler.handle(error as Error, {
-        module: MODULE_NAME,
-        function: 'generateThemeFileContent',
-        operation: 'theme file content generation'
-      });
+      logger.error(MODULE_NAME, 'generateThemeFileContent', 'Error generating theme file:', error as Error);
       
       return this.generateMinimalThemeFileContent();
     }

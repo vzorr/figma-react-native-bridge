@@ -1,11 +1,43 @@
 // src/extractors/base-extractor.ts
-// Base extractor class with common extraction utilities
+// Base extractor class with common extraction utilities - Fixed imports
 
 import { logger, LogFunction } from '@core/logger';
-import { safeGetNumber, isValidNumber } from '@utils/number-utils';
-import { hasFills, hasStrokes, hasEffects, rgbToHex } from '@utils/figma-helpers';
 
 const MODULE_NAME = 'BaseExtractor';
+
+// Simple safe number utility (avoiding import)
+function safeGetNumber(value: any, defaultValue: number = 0): number {
+  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
+    return value;
+  }
+  return defaultValue;
+}
+
+function isValidNumber(value: any): boolean {
+  return typeof value === 'number' && !isNaN(value) && isFinite(value);
+}
+
+// RGB to Hex conversion
+function rgbToHex(r: number, g: number, b: number): string {
+  const toHex = (c: number): string => {
+    const hex = Math.round(c * 255).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+}
+
+// Simple utility functions to avoid imports
+function hasFills(node: any): boolean {
+  return 'fills' in node && node.fills && Array.isArray(node.fills) && node.fills.length > 0;
+}
+
+function hasStrokes(node: any): boolean {
+  return 'strokes' in node && node.strokes && Array.isArray(node.strokes) && node.strokes.length > 0;
+}
+
+function hasEffects(node: any): boolean {
+  return 'effects' in node && node.effects && Array.isArray(node.effects) && node.effects.length > 0;
+}
 
 export abstract class BaseExtractor {
 

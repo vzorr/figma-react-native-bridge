@@ -1,10 +1,17 @@
 // src/detectors/pattern-detector.ts
-// Design pattern detection for UI components
+// Design pattern detection for UI components - Fixed imports
 
 import { logger, LogFunction } from '../core/logger';
-import ComponentDetector from './component-detector';
 
 const MODULE_NAME = 'PatternDetector';
+
+// Simple safe number utility (avoiding import)
+function safeGetNumber(value: any, defaultValue: number = 0): number {
+  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
+    return value;
+  }
+  return defaultValue;
+}
 
 export interface DesignPattern {
   name: string;

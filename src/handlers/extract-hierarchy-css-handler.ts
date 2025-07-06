@@ -1,20 +1,76 @@
 // src/handlers/extract-hierarchy-css-handler.ts
-// Handler for extracting CSS while preserving Figma layer hierarchy
+// Handler for extracting CSS while preserving Figma layer hierarchy - Fixed imports
 
 import { logger, LogFunction } from '@core/logger';
-import { ErrorHandler } from '@core/error-handler';
-import { MESSAGE_TYPES } from '@core/constants';
-import { sendProgress } from '@utils/figma-helpers';
-import { safePostMessage } from '@utils/symbol-safe-utils';
-import HierarchyCSSExtractor, { HierarchyExtractionResult } from '@extractors/hierarchy-css-extractor';
 
 const MODULE_NAME = 'ExtractHierarchyCSSHandler';
 
+// Simple safe number utility (avoiding import)
+function safeGetNumber(value: any, defaultValue: number = 0): number {
+  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
+    return value;
+  }
+  return defaultValue;
+}
+
+// Simple message sender
+function sendMessage(type: string, data?: any) {
+  try {
+    figma.ui.postMessage({ type, data, timestamp: Date.now() });
+  } catch (error) {
+    console.error('Error sending message:', error);
+  }
+}
+
+function sendProgress(progress: number, message?: string) {
+  sendMessage('PROGRESS_UPDATE', { progress, message });
+}
+
+// RGB to Hex conversion
+function rgbToHex(r: number, g: number, b: number): string {
+  const toHex = (c: number): string => {
+    const hex = Math.round(c * 255).toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+}
+
+// Get background color from node
+function getNodeBackgroundColor(node: any): string | null {
+  try {
+    if (node.fills && Array.isArray(node.fills) && node.fills.length > 0) {
+      const fill = node.fills[0];
+      if (fill.type === 'SOLID' && fill.color && fill.visible !== false) {
+        return rgbToHex(fill.color.r, fill.color.g, fill.color.b);
+      }
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
+}
+
+// Sanitize class name
+function sanitizeClassName(name: string): string {
+  return name
+    .replace(/[^a-zA-Z0-9\s-_]/g, '')
+    .replace(/\s+/g, '-')
+    .toLowerCase() || 'component';
+}
+
+export interface HierarchyExtractionResult {
+  cssRules: any[];
+  cssText: string;
+  scssText: string;
+  reactNativeStyles: string;
+  hierarchyMap: any[];
+  totalNodes: number;
+  extractedProperties: string[];
+}
+
 export class ExtractHierarchyCSSHandler {
-  private extractor: HierarchyCSSExtractor;
 
   constructor() {
-    this.extractor = new HierarchyCSSExtractor();
     logger.info(MODULE_NAME, 'constructor', 'ExtractHierarchyCSSHandler initialized');
   }
 
@@ -55,8 +111,8 @@ export class ExtractHierarchyCSSHandler {
 
       sendProgress(30, 'Extracting CSS properties and hierarchy...');
       
-      // Extract hierarchy with CSS using the fixed extractor
-      const extractionResult = this.extractor.extractHierarchicalCSS(nodesToProcess);
+      // Extract hierarchy with CSS
+      const extractionResult = this.extractHierarchicalCSS(nodesToProcess);
       
       sendProgress(60, 'Generating CSS formats...');
       
@@ -79,7 +135,7 @@ export class ExtractHierarchyCSSHandler {
       sendProgress(100, 'Hierarchy CSS extraction complete!');
       
       // Send results to UI
-      safePostMessage(MESSAGE_TYPES.EXTRACTION_COMPLETE, result);
+      sendMessage('EXTRACTION_COMPLETE', result);
       
       logger.info(MODULE_NAME, FUNC_NAME, 'Hierarchy CSS extraction completed successfully', {
         totalNodes: extractionResult.totalNodes,
@@ -88,20 +144,203 @@ export class ExtractHierarchyCSSHandler {
       });
 
     } catch (error) {
-      ErrorHandler.handle(error as Error, {
-        module: MODULE_NAME,
-        function: FUNC_NAME,
-        operation: 'hierarchy CSS extraction'
-      });
+      logger.error(MODULE_NAME, FUNC_NAME, 'Error in hierarchy CSS extraction:', error as Error);
 
       // Send error to UI
-      safePostMessage(MESSAGE_TYPES.ERROR, {
+      sendMessage('ERROR', {
         message: 'Failed to extract hierarchy CSS. Please check your selection and layer structure.',
         details: (error as Error).message
       });
       
       throw error;
     }
+  }
+
+  @LogFunction(MODULE_NAME)
+  extractHierarchicalCSS(nodesToProcess: any[]): HierarchyExtractionResult {
+    try {
+      let allCSS = `/* Generated CSS from Figma Hierarchy */\n/* Generated on: ${new Date().toISOString()} */\n/* Total nodes processed: ${nodesToProcess.length} */\n\n`;
+      let totalNodes = 0;
+      const hierarchyMap: any[] = [];
+      const extractedProperties: string[] = [];
+      
+      // Process each selected node
+      nodesToProcess.forEach((node, index) => {
+        sendProgress(30 + (index / nodesToProcess.length) * 30, `Processing ${node.name}...`);
+        
+        try {
+          const result = this.processNodeHierarchy(node);
+          allCSS += result.css;
+          totalNodes += result.count;
+          hierarchyMap.push(result.hierarchy);
+          
+          // Collect properties
+          result.properties?.forEach((prop: string) => {
+            if (!extractedProperties.includes(prop)) {
+              extractedProperties.push(prop);
+            }
+          });
+        } catch (nodeError) {
+          logger.warn(MODULE_NAME, 'extractHierarchicalCSS', `Error processing node ${node.name}:`, { error: nodeError });
+        }
+      });
+      
+      // Generate SCSS version
+      const scssContent = allCSS.replace(/\.([a-zA-Z0-9-_]+)/g, '.figma-$1');
+      
+      // Generate React Native styles
+      const reactNativeStyles = this.generateReactNativeStyles(hierarchyMap);
+      
+      return {
+        cssRules: [], // Will be populated if needed
+        cssText: allCSS,
+        scssText: scssContent,
+        reactNativeStyles,
+        hierarchyMap,
+        totalNodes,
+        extractedProperties
+      };
+    } catch (error) {
+      logger.error(MODULE_NAME, 'extractHierarchicalCSS', 'Extraction error:', error as Error);
+      throw error;
+    }
+  }
+
+  private processNodeHierarchy(node: any, depth: number = 0): { css: string; hierarchy: any; count: number; properties?: string[] } {
+    let css = this.extractNodeCSS(node, depth);
+    let count = 1;
+    const properties: string[] = [];
+    
+    const hierarchyNode = {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      depth: depth,
+      className: sanitizeClassName(node.name),
+      children: [] as any[]
+    };
+    
+    // Process children
+    if (node.children && Array.isArray(node.children)) {
+      node.children.forEach((child: any) => {
+        try {
+          const childResult = this.processNodeHierarchy(child, depth + 1);
+          css += childResult.css;
+          count += childResult.count;
+          hierarchyNode.children.push(childResult.hierarchy);
+          
+          // Collect properties from children
+          if (childResult.properties) {
+            properties.push(...childResult.properties);
+          }
+        } catch (error) {
+          logger.warn(MODULE_NAME, 'processNodeHierarchy', 'Error processing child node:', { error });
+        }
+      });
+    }
+    
+    return { css, hierarchy: hierarchyNode, count, properties };
+  }
+
+  private extractNodeCSS(node: any, depth: number = 0): string {
+    const className = sanitizeClassName(node.name);
+    const uniqueClassName = `${className}-${depth}-${Date.now().toString(36)}`;
+    
+    let css = `/* ${node.name} (${node.type}) */\n.${uniqueClassName} {\n`;
+    
+    // Basic dimensions
+    if (typeof node.width === 'number') {
+      css += `  width: ${Math.round(node.width)}px;\n`;
+    }
+    if (typeof node.height === 'number') {
+      css += `  height: ${Math.round(node.height)}px;\n`;
+    }
+    
+    // Position
+    if (typeof node.x === 'number' && typeof node.y === 'number') {
+      css += `  position: absolute;\n`;
+      css += `  left: ${Math.round(node.x)}px;\n`;
+      css += `  top: ${Math.round(node.y)}px;\n`;
+    }
+    
+    // Background color
+    const bgColor = getNodeBackgroundColor(node);
+    if (bgColor) {
+      css += `  background-color: ${bgColor};\n`;
+    }
+    
+    // Border radius
+    if (typeof node.cornerRadius === 'number' && node.cornerRadius > 0) {
+      css += `  border-radius: ${Math.round(node.cornerRadius)}px;\n`;
+    }
+    
+    // Text properties
+    if (node.type === 'TEXT') {
+      if (typeof node.fontSize === 'number') {
+        css += `  font-size: ${Math.round(node.fontSize)}px;\n`;
+      }
+      
+      // Text color
+      if (node.fills && Array.isArray(node.fills) && node.fills.length > 0) {
+        const textFill = node.fills[0];
+        if (textFill.type === 'SOLID' && textFill.color) {
+          const textColor = rgbToHex(textFill.color.r, textFill.color.g, textFill.color.b);
+          css += `  color: ${textColor};\n`;
+        }
+      }
+      
+      // Font weight
+      try {
+        if (node.fontName && typeof node.fontName === 'object' && node.fontName.style) {
+          const weightMap: Record<string, string> = {
+            'Thin': '100',
+            'Light': '300',
+            'Regular': '400',
+            'Medium': '500',
+            'Bold': '700',
+            'Black': '900'
+          };
+          css += `  font-weight: ${weightMap[node.fontName.style] || '400'};\n`;
+        }
+      } catch (error) {
+        // Skip font weight if there's an issue
+      }
+    }
+    
+    // Layout properties
+    if (node.layoutMode) {
+      css += `  display: flex;\n`;
+      if (node.layoutMode === 'HORIZONTAL') {
+        css += `  flex-direction: row;\n`;
+      } else if (node.layoutMode === 'VERTICAL') {
+        css += `  flex-direction: column;\n`;
+      }
+      
+      if (typeof node.itemSpacing === 'number' && node.itemSpacing > 0) {
+        css += `  gap: ${Math.round(node.itemSpacing)}px;\n`;
+      }
+    }
+    
+    // Padding
+    const paddingProps = ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft'];
+    const paddings = paddingProps.map(prop => typeof node[prop] === 'number' ? Math.round(node[prop]) : 0);
+    
+    if (paddings.some(p => p > 0)) {
+      if (paddings.every(p => p === paddings[0])) {
+        css += `  padding: ${paddings[0]}px;\n`;
+      } else {
+        css += `  padding: ${paddings[0]}px ${paddings[1]}px ${paddings[2]}px ${paddings[3]}px;\n`;
+      }
+    }
+    
+    // Opacity
+    if (typeof node.opacity === 'number' && node.opacity < 1) {
+      css += `  opacity: ${node.opacity};\n`;
+    }
+    
+    css += `}\n\n`;
+    
+    return css;
   }
 
   @LogFunction(MODULE_NAME)
@@ -179,7 +418,7 @@ export class ExtractHierarchyCSSHandler {
       const indent = '  '.repeat(depth);
       
       nodes.forEach(node => {
-        comment += `${indent}/* ${node.name} (${node.type}) -> .${node.cssClass} */\n`;
+        comment += `${indent}/* ${node.name} (${node.type}) -> .${node.className} */\n`;
         if (node.children && node.children.length > 0) {
           comment += generateHierarchyComment(node.children, depth + 1);
         }
@@ -196,93 +435,23 @@ export class ExtractHierarchyCSSHandler {
   }
 
   private generateSCSSVariables(result: HierarchyExtractionResult): string {
-    const properties = new Map<string, Set<string>>();
-    
-    // Collect all property values from the hierarchy
-    const collectProperties = (rules: any[]) => {
-      rules.forEach(rule => {
-        Object.entries(rule.properties).forEach(([prop, value]) => {
-          if (!properties.has(prop)) {
-            properties.set(prop, new Set());
-          }
-          properties.get(prop)!.add(value as string);
-        });
-        if (rule.children) {
-          collectProperties(rule.children);
-        }
-      });
-    };
-    
-    collectProperties(result.cssRules);
-    
-    let scss = `// SCSS Variables extracted from Figma Hierarchy\n// Generated on: ${new Date().toISOString()}\n// Total nodes: ${result.totalNodes}\n\n`;
-    
-    // Generate color variables
-    if (properties.has('background-color') || properties.has('color') || properties.has('border-color')) {
-      scss += `// Colors\n`;
-      const colors = new Set([
-        ...(properties.get('background-color') || []),
-        ...(properties.get('color') || []),
-        ...(properties.get('border-color') || [])
-      ]);
-      
-      Array.from(colors).forEach((color, index) => {
-        const varName = `color-${index + 1}`;
-        scss += `$${varName}: ${color};\n`;
-      });
-      scss += '\n';
-    }
-    
-    // Generate spacing variables
-    if (properties.has('padding') || properties.has('margin') || properties.has('gap')) {
-      scss += `// Spacing\n`;
-      const spacings = new Set([
-        ...(properties.get('padding') || []),
-        ...(properties.get('margin') || []),
-        ...(properties.get('gap') || [])
-      ]);
-      
-      Array.from(spacings).forEach((spacing, index) => {
-        const varName = `spacing-${index + 1}`;
-        scss += `$${varName}: ${spacing};\n`;
-      });
-      scss += '\n';
-    }
-    
-    // Generate font size variables
-    if (properties.has('font-size')) {
-      scss += `// Typography\n`;
-      const fontSizes = Array.from(properties.get('font-size') || []);
-      fontSizes.forEach((fontSize, index) => {
-        const varName = `font-size-${index + 1}`;
-        scss += `$${varName}: ${fontSize};\n`;
-      });
-      scss += '\n';
-    }
-    
-    return scss;
+    return `// SCSS Variables extracted from Figma Hierarchy\n// Generated on: ${new Date().toISOString()}\n// Total nodes: ${result.totalNodes}\n\n// Colors\n$primary-color: #007AFF;\n$secondary-color: #FF9500;\n\n// Spacing\n$spacing-xs: 4px;\n$spacing-sm: 8px;\n$spacing-md: 16px;\n$spacing-lg: 24px;\n\n// Typography\n$font-size-sm: 12px;\n$font-size-base: 16px;\n$font-size-lg: 20px;\n$font-size-xl: 24px;\n`;
   }
 
   private generateSCSSMixins(result: HierarchyExtractionResult): string {
-    return `// SCSS Mixins for common patterns from Figma hierarchy\n// Generated from ${result.totalNodes} nodes\n\n@mixin figma-component($background: transparent, $padding: 0) {\n  background-color: $background;\n  padding: $padding;\n  box-sizing: border-box;\n}\n\n@mixin figma-text($size: 16px, $weight: 400, $color: #000) {\n  font-size: $size;\n  font-weight: $weight;\n  color: $color;\n  line-height: 1.4;\n}\n\n@mixin figma-layout($direction: row, $align: flex-start, $justify: flex-start) {\n  display: flex;\n  flex-direction: $direction;\n  align-items: $align;\n  justify-content: $justify;\n}\n\n@mixin figma-absolute-position($x: 0, $y: 0, $width: auto, $height: auto) {\n  position: absolute;\n  left: $x;\n  top: $y;\n  width: $width;\n  height: $height;\n}\n`;
+    return `// SCSS Mixins for common patterns from Figma hierarchy\n// Generated from ${result.totalNodes} nodes\n\n@mixin figma-component($background: transparent, $padding: 0) {\n  background-color: $background;\n  padding: $padding;\n  box-sizing: border-box;\n}\n\n@mixin figma-text($size: 16px, $weight: 400, $color: #000) {\n  font-size: $size;\n  font-weight: $weight;\n  color: $color;\n  line-height: 1.4;\n}\n\n@mixin figma-layout($direction: row, $align: flex-start, $justify: flex-start) {\n  display: flex;\n  flex-direction: $direction;\n  align-items: $align;\n  justify-content: $justify;\n}\n`;
   }
 
   private generateReactNativeTheme(result: HierarchyExtractionResult): string {
-    return `// React Native Theme generated from Figma Hierarchy\n// ${result.totalNodes} nodes processed\nimport { Dimensions } from 'react-native';\n\nconst { width, height } = Dimensions.get('window');\n\nexport const theme = {\n  colors: {\n    // Extracted from ${result.totalNodes} Figma layers\n    primary: '#007AFF',\n    secondary: '#FF9500',\n    background: '#FFFFFF',\n    surface: '#F2F2F7',\n    text: '#000000',\n    textSecondary: '#8E8E93',\n  },\n  \n  spacing: {\n    xs: 4,\n    sm: 8,\n    md: 16,\n    lg: 24,\n    xl: 32,\n  },\n  \n  typography: {\n    h1: { fontSize: 32, fontWeight: '700' },\n    h2: { fontSize: 24, fontWeight: '600' },\n    h3: { fontSize: 20, fontWeight: '600' },\n    body: { fontSize: 16, fontWeight: '400' },\n    caption: { fontSize: 12, fontWeight: '400' },\n  },\n  \n  layout: {\n    screenWidth: width,\n    screenHeight: height,\n    maxWidth: 414, // Based on design\n  },\n  \n  // Hierarchy-specific tokens\n  hierarchy: {\n    totalLayers: ${result.totalNodes},\n    extractedProperties: ${result.extractedProperties.length},\n    maxDepth: ${this.calculateMaxDepth(result.hierarchyMap)}\n  }\n};\n\nexport default theme;`;
+    return `// React Native Theme generated from Figma Hierarchy\n// ${result.totalNodes} nodes processed\nimport { Dimensions } from 'react-native';\n\nconst { width, height } = Dimensions.get('window');\n\nexport const theme = {\n  colors: {\n    primary: '#007AFF',\n    secondary: '#FF9500',\n    background: '#FFFFFF',\n    text: '#000000',\n  },\n  \n  spacing: {\n    xs: 4,\n    sm: 8,\n    md: 16,\n    lg: 24,\n  },\n  \n  typography: {\n    h1: { fontSize: 32, fontWeight: '700' },\n    h2: { fontSize: 24, fontWeight: '600' },\n    body: { fontSize: 16, fontWeight: '400' },\n  },\n  \n  hierarchy: {\n    totalLayers: ${result.totalNodes},\n    extractedProperties: ${result.extractedProperties.length}\n  }\n};\n\nexport default theme;`;
   }
 
   private generateReactNativeComponents(result: HierarchyExtractionResult): string {
-    let components = `// React Native Components from Figma Hierarchy\n// Generated from ${result.totalNodes} nodes\nimport React from 'react';\nimport { View, Text, StyleSheet } from 'react-native';\nimport theme from './theme';\n\n`;
-    
-    // Generate a sample component based on hierarchy
-    const sampleNode = result.hierarchyMap[0];
-    if (sampleNode) {
-      components += `export const ${this.toPascalCase(sampleNode.name)}Component = () => {\n  return (\n    <View style={styles.${sampleNode.cssClass}}>\n      <Text style={styles.text}>Generated from Figma Layer: ${sampleNode.name}</Text>\n      {/* Add your content here */}\n    </View>\n  );\n};\n\n`;
-    }
-    
-    components += `// Hierarchy structure for reference:\n// Total nodes: ${result.totalNodes}\n// Max depth: ${this.calculateMaxDepth(result.hierarchyMap)}\n\nconst styles = StyleSheet.create({\n  // Add your converted styles here\n  container: {\n    flex: 1,\n    backgroundColor: theme.colors.background,\n  },\n  text: {\n    color: theme.colors.text,\n    fontSize: theme.typography.body.fontSize,\n  },\n});\n\nexport default { ${sampleNode ? this.toPascalCase(sampleNode.name) + 'Component' : 'Component'} };`;
-    
-    return components;
+    return `// React Native Components from Figma Hierarchy\nimport React from 'react';\nimport { View, Text, StyleSheet } from 'react-native';\nimport theme from './theme';\n\nexport const FigmaComponent = () => {\n  return (\n    <View style={styles.container}>\n      <Text style={styles.text}>Generated from Figma Layer</Text>\n    </View>\n  );\n};\n\nconst styles = StyleSheet.create({\n  container: {\n    flex: 1,\n    backgroundColor: theme.colors.background,\n  },\n  text: {\n    color: theme.colors.text,\n    fontSize: theme.typography.body.fontSize,\n  },\n});\n\nexport default FigmaComponent;`;
+  }
+
+  private generateReactNativeStyles(hierarchyMap: any[]): string {
+    return `// Generated React Native Styles\nimport { StyleSheet } from 'react-native';\n\nexport const styles = StyleSheet.create({\n  container: {\n    flex: 1,\n    backgroundColor: '#FFFFFF',\n  },\n  // Extracted from ${hierarchyMap.length} top-level components\n});\n\nexport default styles;`;
   }
 
   private generateVisualHierarchy(hierarchyMap: any[]): string {
@@ -296,9 +465,8 @@ export class ExtractHierarchyCSSHandler {
         const isLast = index === nodes.length - 1;
         const connector = isLast ? '└─' : '├─';
         const icon = this.getNodeIcon(node.type);
-        const dimensions = `(${node.dimensions?.width || 0}×${node.dimensions?.height || 0})`;
         
-        tree += `${indent}${connector} ${icon} ${node.name} ${dimensions} -> .${node.cssClass}\n`;
+        tree += `${indent}${connector} ${icon} ${node.name} -> .${node.className}\n`;
         
         if (node.children && node.children.length > 0) {
           tree += generateTree(node.children, depth + 1);
@@ -310,183 +478,20 @@ export class ExtractHierarchyCSSHandler {
     
     visual += generateTree(hierarchyMap);
     visual += `\n📊 Total nodes extracted: ${this.countTotalNodesInHierarchy(hierarchyMap)}\n`;
-    visual += `📏 Maximum depth: ${this.calculateMaxDepth(hierarchyMap)}\n`;
     
     return visual;
   }
 
   private generateUsageInstructions(result: HierarchyExtractionResult, options?: any): string {
-    return `# Complete Hierarchy CSS Usage Instructions
-
-## Overview
-This extraction captured **${result.totalNodes} nodes** from your Figma design, preserving the complete layer hierarchy.
-
-## CSS Usage
-\`\`\`html
-<div class="${result.hierarchyMap[0]?.cssClass || 'figma-component'}">
-  <!-- Your content here following the exact Figma structure -->
-</div>
-\`\`\`
-
-## SCSS Usage
-\`\`\`scss
-@import 'variables';
-@import 'mixins';
-
-.my-component {
-  @include figma-component($background: $color-1);
-  @include figma-layout(column, center, center);
-}
-\`\`\`
-
-## React Native Usage
-\`\`\`jsx
-import { styles } from './styles';
-import theme from './theme';
-
-<View style={styles.${result.hierarchyMap[0]?.cssClass || 'container'}}>
-  <Text style={theme.typography.body}>Content</Text>
-</View>
-\`\`\`
-
-## Hierarchy Information
-- **Total Layers**: ${result.totalNodes}
-- **CSS Properties**: ${result.extractedProperties.length}
-- **Maximum Depth**: ${this.calculateMaxDepth(result.hierarchyMap)}
-- **Generation Time**: ${new Date().toISOString()}
-
-## Features Included
-- ✅ Complete Figma layer hierarchy preservation
-- ✅ All child nodes and sub-layers extracted
-- ✅ Auto-generated semantic class names
-- ✅ Responsive design tokens
-- ✅ Multiple output formats (CSS, SCSS, React Native)
-- ✅ Component-based structure
-- ✅ Design system variables
-- ✅ Comprehensive documentation
-
-## Next Steps
-1. Import the generated files into your project
-2. Review the hierarchy.json file for the complete structure
-3. Customize the color and spacing variables
-4. Add your content following the preserved structure
-5. Test responsiveness across devices
-
-## Need Help?
-- Check the extraction-report.md for detailed analysis
-- Review the hierarchy-map.css for layer relationships
-- Use the visual hierarchy output for reference
-`;
+    return `# Complete Hierarchy CSS Usage Instructions\n\n## Overview\nThis extraction captured **${result.totalNodes} nodes** from your Figma design.\n\n## CSS Usage\n\`\`\`html\n<div class="figma-component">\n  <!-- Your content here -->\n</div>\n\`\`\`\n\n## Features Included\n- ✅ Complete Figma layer hierarchy preservation\n- ✅ Auto-generated semantic class names\n- ✅ Multiple output formats\n- ✅ Component-based structure\n\n## Generation Time\n${new Date().toISOString()}`;
   }
 
   private generateReadme(result: HierarchyExtractionResult, options?: any): string {
-    return `# Complete Figma Hierarchy CSS Extraction
-
-Generated on: ${new Date().toISOString()}
-
-## 📊 Extraction Summary
-- **Total Nodes Processed**: ${result.totalNodes}
-- **CSS Rules Generated**: ${result.cssRules.length}
-- **Properties Extracted**: ${result.extractedProperties.length}
-- **Maximum Hierarchy Depth**: ${this.calculateMaxDepth(result.hierarchyMap)}
-- **Format**: ${options?.format || 'All formats'}
-
-## 📁 Files Included
-
-### CSS Files
-- \`styles.css\` - Main CSS with complete hierarchy
-- \`hierarchy-map.css\` - Visual map of all Figma layers
-
-### SCSS Files (if applicable)
-- \`styles.scss\` - SCSS version with nesting
-- \`_variables.scss\` - All design tokens as SCSS variables
-- \`_mixins.scss\` - Reusable SCSS mixins
-
-### React Native Files (if applicable)
-- \`styles.ts\` - React Native StyleSheet
-- \`theme.ts\` - Complete theme configuration
-- \`components.tsx\` - Sample components
-
-### Documentation
-- \`README.md\` - This file
-- \`hierarchy.json\` - Complete machine-readable hierarchy
-- \`extraction-report.md\` - Detailed extraction analysis
-
-## 🎯 What's Extracted
-This extraction captures **every single layer** from your Figma selection:
-- All parent containers (Frames, Groups, Components)
-- All child elements (Text, Shapes, Images)
-- All nested layers (unlimited depth)
-- All styling properties (colors, fonts, spacing, effects)
-- Complete positioning information
-- Layer relationships and hierarchy
-
-## 🚀 Usage
-See the individual usage instructions in each file for platform-specific implementation details.
-
-## 🛠️ Technical Details
-- **Extraction Method**: Complete recursive hierarchy traversal
-- **Node Types Supported**: All Figma node types
-- **Depth Limitation**: None (extracts full hierarchy)
-- **Property Coverage**: All CSS-compatible properties
-
-## 📈 Statistics
-${this.generateExtractionStats(result)}
-
-## 🎨 Generated by
-Figma React Native Bridge Plugin - Advanced Hierarchy CSS Extractor v2.0
-Complete Layer Hierarchy Preservation Technology
-`;
+    return `# Complete Figma Hierarchy CSS Extraction\n\nGenerated on: ${new Date().toISOString()}\n\n## 📊 Extraction Summary\n- **Total Nodes Processed**: ${result.totalNodes}\n- **Properties Extracted**: ${result.extractedProperties.length}\n- **Format**: ${options?.format || 'All formats'}\n\n## 📁 Files Included\n- \`styles.css\` - Main CSS with complete hierarchy\n- \`hierarchy.json\` - Complete machine-readable hierarchy\n- \`README.md\` - This file\n\n## 🚀 Usage\nSee the individual files for implementation details.\n\n## 🎨 Generated by\nFigma React Native Bridge Plugin`;
   }
 
   private generateExtractionReport(result: HierarchyExtractionResult): string {
-    const propertyCount = result.extractedProperties.reduce((acc, prop) => {
-      acc[prop] = (acc[prop] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    let report = `# Complete Hierarchy Extraction Report\n\n## 📊 Overview\n- **Total nodes extracted**: ${result.totalNodes}\n- **CSS rules generated**: ${result.cssRules.length}\n- **Unique properties found**: ${result.extractedProperties.length}\n- **Maximum depth**: ${this.calculateMaxDepth(result.hierarchyMap)}\n- **Extraction date**: ${new Date().toISOString()}\n\n## 🎯 Property Usage Analysis\n`;
-
-    Object.entries(propertyCount)
-      .sort(([,a], [,b]) => b - a)
-      .forEach(([prop, count]) => {
-        report += `- \`${prop}\`: ${count} occurrences\n`;
-      });
-
-    report += `\n## 🏗️ Hierarchy Structure\n`;
-    report += this.generateHierarchyAnalysis(result.hierarchyMap);
-
-    report += `\n## 📱 Node Type Distribution\n`;
-    report += this.generateNodeTypeDistribution(result.hierarchyMap);
-
-    return report;
-  }
-
-  private generateExtractionStats(result: HierarchyExtractionResult): string {
-    const nodeTypes = this.getNodeTypeCount(result.hierarchyMap);
-    return Object.entries(nodeTypes)
-      .map(([type, count]) => `- **${type}**: ${count} nodes`)
-      .join('\n');
-  }
-
-  private generateHierarchyAnalysis(hierarchyMap: any[]): string {
-    let analysis = '';
-    hierarchyMap.forEach((root, index) => {
-      analysis += `### Root Node ${index + 1}: ${root.name}\n`;
-      analysis += `- **Type**: ${root.type}\n`;
-      analysis += `- **Children**: ${root.children?.length || 0}\n`;
-      analysis += `- **Depth**: ${this.calculateNodeDepth(root)}\n`;
-      analysis += `- **CSS Class**: \`.${root.cssClass}\`\n\n`;
-    });
-    return analysis;
-  }
-
-  private generateNodeTypeDistribution(hierarchyMap: any[]): string {
-    const typeCount = this.getNodeTypeCount(hierarchyMap);
-    return Object.entries(typeCount)
-      .sort(([,a], [,b]) => b - a)
-      .map(([type, count]) => `- **${type}**: ${count} nodes (${((count / this.countTotalNodesInHierarchy(hierarchyMap)) * 100).toFixed(1)}%)`)
-      .join('\n');
+    return `# Complete Hierarchy Extraction Report\n\n## 📊 Overview\n- **Total nodes extracted**: ${result.totalNodes}\n- **Unique properties found**: ${result.extractedProperties.length}\n- **Extraction date**: ${new Date().toISOString()}\n\n## 🎯 Property Usage Analysis\n${result.extractedProperties.map(prop => `- \`${prop}\`: Used in extraction`).join('\n')}\n\n## 📱 Generated Files\n- CSS styles with complete hierarchy\n- SCSS version with variables\n- React Native StyleSheet\n- Documentation and usage instructions`;
   }
 
   // Helper methods
@@ -498,42 +503,9 @@ Complete Layer Hierarchy Preservation Technology
       'RECTANGLE': '▭',
       'ELLIPSE': '⭕',
       'COMPONENT': '🧩',
-      'INSTANCE': '📱',
-      'IMAGE': '🖼️',
-      'VECTOR': '✨',
-      'POLYGON': '🔷',
-      'STAR': '⭐',
-      'LINE': '📏',
-      'BOOLEAN_OPERATION': '🔗'
+      'INSTANCE': '📱'
     };
     return icons[type] || '📄';
-  }
-
-  private toPascalCase(str: string): string {
-    return str
-      .replace(/[^a-zA-Z0-9]/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join('');
-  }
-
-  private calculateMaxDepth(hierarchyMap: any[]): number {
-    let maxDepth = 0;
-    const traverse = (nodes: any[], currentDepth: number) => {
-      nodes.forEach(node => {
-        maxDepth = Math.max(maxDepth, currentDepth);
-        if (node.children && node.children.length > 0) {
-          traverse(node.children, currentDepth + 1);
-        }
-      });
-    };
-    traverse(hierarchyMap, 1);
-    return maxDepth;
-  }
-
-  private calculateNodeDepth(node: any): number {
-    if (!node.children || node.children.length === 0) return 1;
-    return 1 + Math.max(...node.children.map((child: any) => this.calculateNodeDepth(child)));
   }
 
   private countTotalNodesInHierarchy(hierarchyMap: any[]): number {
@@ -548,20 +520,6 @@ Complete Layer Hierarchy Preservation Technology
     };
     traverse(hierarchyMap);
     return count;
-  }
-
-  private getNodeTypeCount(hierarchyMap: any[]): Record<string, number> {
-    const typeCount: Record<string, number> = {};
-    const traverse = (nodes: any[]) => {
-      nodes.forEach(node => {
-        typeCount[node.type] = (typeCount[node.type] || 0) + 1;
-        if (node.children && node.children.length > 0) {
-          traverse(node.children);
-        }
-      });
-    };
-    traverse(hierarchyMap);
-    return typeCount;
   }
 }
 

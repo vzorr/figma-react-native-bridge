@@ -1,12 +1,60 @@
 // src/extractors/typography-extractor.ts
-// Typography extraction with safe font property handling
+// Typography extraction with safe font property handling - Fixed imports
 
 import { logger, LogFunction } from '@core/logger';
-import { safeGetNumber, isValidNumber } from '@utils/number-utils';
-import { getNodeFontSize, getNodeFontWeight } from '@utils/figma-helpers';
-import { DESIGN_TOKENS, FONT_WEIGHT_MAPPINGS } from '@core/constants';
 
 const MODULE_NAME = 'TypographyExtractor';
+
+// Simple safe number utility (avoiding import)
+function safeGetNumber(value: any, defaultValue: number = 0): number {
+  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
+    return value;
+  }
+  return defaultValue;
+}
+
+function isValidNumber(value: any): boolean {
+  return typeof value === 'number' && !isNaN(value) && isFinite(value);
+}
+
+// Simple font weight mappings
+const FONT_WEIGHT_MAPPINGS: Record<string, string> = {
+  'Thin': '100',
+  'Extra Light': '200',
+  'ExtraLight': '200',
+  'Light': '300',
+  'Normal': '400',
+  'Regular': '400',
+  'Medium': '500',
+  'Semi Bold': '600',
+  'SemiBold': '600',
+  'DemiBold': '600',
+  'Bold': '700',
+  'Extra Bold': '800',
+  'ExtraBold': '800',
+  'Black': '900',
+  'Heavy': '900',
+  'Ultra': '900',
+  // Numeric fallbacks
+  '100': '100',
+  '200': '200', 
+  '300': '300',
+  '400': '400',
+  '500': '500',
+  '600': '600',
+  '700': '700',
+  '800': '800',
+  '900': '900'
+};
+
+// Simple font size constraints
+const DESIGN_TOKENS = {
+  fontSize: {
+    min: 8,
+    max: 72,
+    common: [10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48]
+  }
+};
 
 export interface TypographyData {
   fontSizes: Set<number>;
@@ -20,6 +68,27 @@ export interface TypographyData {
     letterSpacing?: number;
     usage: string;
   }>;
+}
+
+// Simple helper functions
+function getNodeFontSize(node: any): number | null {
+  if (node.type === 'TEXT' && isValidNumber(node.fontSize)) {
+    return safeGetNumber(node.fontSize);
+  }
+  return null;
+}
+
+function getNodeFontWeight(node: any): string | null {
+  try {
+    if (node.type === 'TEXT' && node.fontName && typeof node.fontName === 'object' && node.fontName !== figma?.mixed) {
+      if (node.fontName.style && typeof node.fontName.style === 'string') {
+        return node.fontName.style;
+      }
+    }
+    return null;
+  } catch (error) {
+    return null;
+  }
 }
 
 export class TypographyExtractor {
@@ -157,23 +226,25 @@ export class TypographyExtractor {
 
     logger.info(MODULE_NAME, 'extractAllTypography', `Processing ${nodes.length} nodes for typography`);
 
-    nodes.forEach((node: any, index: number) => {
+    const processNode = (node: any) => {
       try {
         if (node && node.visible !== false) {
           this.extractFromNode(node, typography);
           
           // Also check children for nested text
           if (node.children && Array.isArray(node.children)) {
-            this.extractAllTypography(node.children);
+            node.children.forEach((child: any) => processNode(child));
           }
         }
       } catch (nodeError) {
-        logger.warn(MODULE_NAME, 'extractAllTypography', `Error processing node ${index}:`, { 
+        logger.warn(MODULE_NAME, 'extractAllTypography', `Error processing node:`, { 
           error: nodeError,
           node: node?.name || 'unnamed'
         });
       }
-    });
+    };
+
+    nodes.forEach((node: any) => processNode(node));
 
     logger.info(MODULE_NAME, 'extractAllTypography', 'Typography extraction complete', {
       fontSizes: typography.fontSizes.size,
@@ -239,8 +310,7 @@ export class TypographyExtractor {
 
   private normalizeFontWeight(weight: string): string {
     // Handle Figma font weight names
-    const mapping = FONT_WEIGHT_MAPPINGS as Record<string, string>;
-    return mapping[weight] || weight || '400';
+    return FONT_WEIGHT_MAPPINGS[weight] || weight || '400';
   }
 
   private extractFontFamilyFromNode(node: any): string | null {

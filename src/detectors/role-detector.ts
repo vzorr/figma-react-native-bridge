@@ -1,10 +1,34 @@
 // src/detectors/role-detector.ts
-// New file - follows same pattern as your existing component-detector.ts
+// Fixed to remove missing dependencies
 
 import { logger, LogFunction } from '@core/logger';
-import { UserRole, LayerAnalysis } from '@core/types';
 
 const MODULE_NAME = 'RoleDetector';
+
+// Inline types to avoid import issues
+export interface UserRole {
+  id: string;
+  name: string;
+  type: 'customer' | 'admin' | 'operator' | 'guest' | 'moderator' | 'unknown';
+  confidence: number;
+  detectionSource: 'layer_name' | 'folder_structure' | 'content_analysis';
+  permissions?: string[];
+}
+
+export interface LayerAnalysis {
+  layerName: string;
+  parentLayers: string[];
+  depth: number;
+  detectedRole?: UserRole;
+  detectedFlow?: string;
+  namingPatterns: {
+    hasRolePrefix: boolean;
+    hasFlowIndicator: boolean;
+    hasSequenceNumber: boolean;
+    hasDeviceIndicator: boolean;
+  };
+  confidence: number;
+}
 
 export class RoleDetector {
 
