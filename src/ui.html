@@ -724,17 +724,31 @@ body {
     let selectedLayerIds = new Set();
     let extractionResults = null;
 
+    // FIXED: Enhanced message sending with proper format
+    function sendPluginMessage(type, data = null) {
+      try {
+        const message = {
+          pluginMessage: {
+            type: type,
+            data: data,
+            timestamp: Date.now()
+          }
+        };
+        
+        console.log('Sending message:', message);
+        parent.postMessage(message, '*');
+      } catch (error) {
+        console.error('Error sending message:', error);
+        showError('Communication error with plugin');
+      }
+    }
+
     // Initialize the plugin
     document.addEventListener('DOMContentLoaded', function() {
       console.log('UI initialized');
       
       // Send ready message to plugin
-      parent.postMessage({ 
-        pluginMessage: { 
-          type: 'PLUGIN_READY',
-          timestamp: Date.now()
-        } 
-      }, '*');
+      sendPluginMessage('PLUGIN_READY');
     });
 
     // Tab switching
@@ -753,13 +767,7 @@ body {
     // Layer listing functionality
     function listAllLayers() {
       showLoading('🔍 Scanning all layers in your design...');
-      
-      parent.postMessage({ 
-        pluginMessage: { 
-          type: 'LIST_ALL_LAYERS',
-          timestamp: Date.now()
-        } 
-      }, '*');
+      sendPluginMessage('LIST_ALL_LAYERS');
     }
 
     function displayLayerTree(data) {
@@ -900,38 +908,20 @@ body {
       }
       
       showLoading(`🎨 Extracting CSS from ${selectedLayerIds.size} selected layers...`);
-      
-      parent.postMessage({ 
-        pluginMessage: { 
-          type: 'EXTRACT_SELECTED_LAYERS',
-          selectedLayerIds: Array.from(selectedLayerIds),
-          timestamp: Date.now()
-        } 
-      }, '*');
+      sendPluginMessage('EXTRACT_SELECTED_LAYERS', {
+        selectedLayerIds: Array.from(selectedLayerIds)
+      });
     }
 
     // Quick extract functions
     function extractAllLayers() {
       showLoading('🌟 Extracting CSS from all layers...');
-      
-      parent.postMessage({ 
-        pluginMessage: { 
-          type: 'EXTRACT_HIERARCHY_CSS',
-          options: { format: 'all' },
-          timestamp: Date.now()
-        } 
-      }, '*');
+      sendPluginMessage('EXTRACT_HIERARCHY_CSS', { options: { format: 'all' } });
     }
 
     function extractCurrentSelection() {
       showLoading('🎯 Extracting CSS from current Figma selection...');
-      
-      parent.postMessage({ 
-        pluginMessage: { 
-          type: 'EXTRACT_CURRENT_SELECTION',
-          timestamp: Date.now()
-        } 
-      }, '*');
+      sendPluginMessage('EXTRACT_CURRENT_SELECTION');
     }
 
     // Utility functions
@@ -1034,15 +1024,20 @@ body {
     }
 
     function downloadFile(fileName, content) {
-      const blob = new Blob([content], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
-      
-      showSuccess(`📥 Downloaded ${fileName}`);
+      try {
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        showSuccess(`📥 Downloaded ${fileName}`);
+      } catch (error) {
+        console.error('Download error:', error);
+        showError(`Failed to download ${fileName}`);
+      }
     }
 
     function closeModal() {
@@ -1074,31 +1069,69 @@ body {
       return div.innerHTML;
     }
 
-    // Message handler
+    // FIXED: Enhanced message handler with proper error handling
     window.addEventListener('message', function(event) {
-      const { type, data } = event.data.pluginMessage || {};
-      
-      switch (type) {
-        case 'PROGRESS_UPDATE':
-          updateProgress(data.progress, data.message);
-          break;
-          
-        case 'LAYERS_LISTED':
-          hideLoading();
-          displayLayerTree(data);
-          showSuccess(`🔍 Found ${data.totalLayers} layers in your design!`);
-          break;
-          
-        case 'EXTRACTION_COMPLETE':
-          hideLoading();
-          showResultsModal(data);
-          showSuccess('🎉 CSS extraction completed successfully!');
-          break;
-          
-        case 'ERROR':
-          showError(data.message || 'An error occurred');
-          break;
+      try {
+        const pluginMessage = event.data.pluginMessage;
+        if (!pluginMessage) return;
+        
+        const { type, data } = pluginMessage;
+        console.log('Received message:', type, data);
+        
+        switch (type) {
+          case 'PROGRESS_UPDATE':
+            if (data && typeof data.progress === 'number') {
+              updateProgress(data.progress, data.message);
+            }
+            break;
+            
+          case 'LAYERS_LISTED':
+            hideLoading();
+            displayLayerTree(data);
+            showSuccess(`🔍 Found ${data.totalLayers} layers in your design!`);
+            break;
+            
+          case 'EXTRACTION_COMPLETE':
+            hideLoading();
+            showResultsModal(data);
+            showSuccess('🎉 CSS extraction completed successfully!');
+            break;
+            
+          case 'SELECTION_CHANGED':
+            if (data) {
+              console.log('Selection changed:', data);
+              // Update UI based on selection changes if needed
+            }
+            break;
+            
+          case 'ERROR':
+            showError(data?.message || 'An error occurred');
+            break;
+            
+          case 'SUCCESS':
+            if (data?.message) {
+              showSuccess(data.message);
+            }
+            break;
+            
+          default:
+            console.log('Unhandled message type:', type);
+        }
+      } catch (error) {
+        console.error('Error handling message:', error);
+        showError('Communication error occurred');
       }
+    });
+
+    // FIXED: Add error boundary for the whole application
+    window.addEventListener('error', function(event) {
+      console.error('Global error:', event.error);
+      showError('An unexpected error occurred. Please refresh the plugin.');
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+      console.error('Unhandled promise rejection:', event.reason);
+      showError('An unexpected error occurred. Please refresh the plugin.');
     });
   </script>
 </body>
