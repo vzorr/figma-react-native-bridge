@@ -1,5 +1,5 @@
 // src/main.ts - Fixed and Simplified Working Version
-// This version removes complex imports and focuses on core functionality
+// Removed all missing references and complex imports
 
 // Simple types for the plugin
 interface PluginMessage {

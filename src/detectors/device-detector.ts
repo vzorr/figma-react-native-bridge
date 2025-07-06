@@ -1,11 +1,33 @@
 // src/detectors/device-detector.ts
-// Device type detection based on dimensions and aspect ratios
+// Fixed to remove missing dependencies
 
 import { logger, LogFunction } from '@core/logger';
-import { safeGetNumber } from '@utils/number-utils';
-import { DEVICE_BREAKPOINTS } from '@core/constants';
 
 const MODULE_NAME = 'DeviceDetector';
+
+// Simple safe number utility (avoiding import)
+function safeGetNumber(value: any, defaultValue: number = 0): number {
+  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
+    return value;
+  }
+  return defaultValue;
+}
+
+// Device breakpoints (inline to avoid import)
+const DEVICE_BREAKPOINTS = {
+  mobile: {
+    maxWidth: 480,
+    aspectRatio: { min: 0.4, max: 0.8 }
+  },
+  tablet: {
+    maxWidth: 1024,
+    aspectRatio: { min: 0.6, max: 1.4 }
+  },
+  desktop: {
+    minWidth: 1024,
+    aspectRatio: { min: 1.2, max: 3.0 }
+  }
+};
 
 export type DeviceType = 'mobile' | 'tablet' | 'desktop' | 'unknown';
 

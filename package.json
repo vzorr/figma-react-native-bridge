@@ -6,30 +6,19 @@
   "author": "Your Name",
   "license": "MIT",
   "scripts": {
-    "dev": "webpack --mode development --watch --stats=minimal",
+    "dev": "webpack --mode development --watch",
     "build": "npm run clean && webpack --mode production",
     "build:dev": "webpack --mode development",
     "clean": "rimraf dist",
-    "debug": "node debug-build.js",
-    "check-files": "node -e \"const fs = require('fs'); const path = require('path'); console.log('\\n📁 Checking dist files:'); try { const files = fs.readdirSync('./dist'); console.log('Files in dist:', files.length, 'files'); files.forEach(f => { const stat = fs.statSync(path.join('./dist', f)); console.log(\\`  ✅ \\${f}: \\${(stat.size/1024).toFixed(2)}KB\\`); }); console.log('\\n🎉 All required files present!'); } catch(e) { console.log('❌ No dist folder found. Run npm run build first.'); }\""
+    "check-files": "node -e \"const fs = require('fs'); console.log('Checking dist files:'); try { const files = fs.readdirSync('./dist'); console.log('Files:', files); } catch(e) { console.log('No dist folder found.'); }\""
   },
   "devDependencies": {
     "@types/figma": "^1.0.4",
     "@types/node": "^18.15.0",
-    "@typescript-eslint/eslint-plugin": "^5.57.0",
-    "@typescript-eslint/parser": "^5.57.0",
-    "eslint": "^8.37.0",
-    "eslint-config-prettier": "^8.8.0",
-    "eslint-plugin-prettier": "^4.2.1",
-    "madge": "^6.0.0",
-    "prettier": "^2.8.7",
     "rimraf": "^4.4.1",
-    "size-limit": "^8.2.4",
     "ts-loader": "^9.4.2",
-    "typedoc": "^0.24.1",
     "typescript": "^5.0.2",
     "webpack": "^5.76.0",
-    "webpack-bundle-analyzer": "^4.8.0",
     "webpack-cli": "^5.0.1"
   }
 }

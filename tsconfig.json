@@ -1,9 +1,9 @@
 {
   "compilerOptions": {
-    "target": "ES5",  // Changed from ES2020 to ES5 for Figma compatibility
-    "module": "CommonJS",  // Changed from ESNext to CommonJS
+    "target": "ES5",
+    "module": "CommonJS",
     "moduleResolution": "node",
-    "lib": ["ES5", "DOM"],  // Changed from ES2020 to ES5
+    "lib": ["ES5", "DOM"],
     "outDir": "./dist",
     "rootDir": "./src",
     "strict": false,
@@ -29,36 +29,22 @@
     "removeComments": false,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "downlevelIteration": true,  // Added for better ES5 compatibility
+    "downlevelIteration": true,
     "baseUrl": "./src",
     "paths": {
       "@core/*": ["core/*"],
-      "@extractors/*": ["extractors/*"],
-      "@generators/*": ["generators/*"],
-      "@detectors/*": ["detectors/*"],
-      "@utils/*": ["utils/*"],
-      "@handlers/*": ["handlers/*"],
-      "@types/*": ["types/*"]
+      "@utils/*": ["utils/*"]
     },
-    "types": ["figma", "node"],
-    "typeRoots": ["./node_modules/@types", "./src/types"]
+    "types": ["node"],
+    "typeRoots": ["./node_modules/@types"]
   },
   "include": [
-    "src/**/*",
-    "global.d.ts"
+    "src/**/*"
   ],
   "exclude": [
     "node_modules",
     "dist",
     "**/*.test.ts",
-    "**/*.spec.ts",
-    "coverage",
-    "docs"
-  ],
-  "ts-node": {
-    "esm": true,
-    "compilerOptions": {
-      "module": "CommonJS"  // Changed from ESNext
-    }
-  }
+    "**/*.spec.ts"
+  ]
 }

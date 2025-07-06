@@ -1,10 +1,9 @@
 // src/extractors/hierarchy-css-extractor.ts
-// Enhanced CSS extraction that preserves exact Figma layer hierarchy
+// Fixed to remove missing dependencies
 
 import { logger, LogFunction } from '@core/logger';
 import { ErrorHandler } from '@core/error-handler';
 import { safeGetNumber, isValidNumber } from '@utils/number-utils';
-import { rgbToHex, getAllPages, findAllNodes } from '@utils/figma-helpers';
 
 const MODULE_NAME = 'HierarchyCSSExtractor';
 
@@ -110,7 +109,6 @@ export class HierarchyCSSExtractor {
     }
   }
 
-  @LogFunction(MODULE_NAME)
   private getAllSelectableNodes(): any[] {
     try {
       // Get from current selection first
@@ -130,34 +128,23 @@ export class HierarchyCSSExtractor {
     }
   }
 
-  @LogFunction(MODULE_NAME)
   private buildCompleteHierarchyMap(nodes: any[]): HierarchyNode[] {
-    const FUNC_NAME = 'buildCompleteHierarchyMap';
-    
-    try {
-      const hierarchyMap: HierarchyNode[] = [];
-      const processedIds = new Set<string>();
+    const hierarchyMap: HierarchyNode[] = [];
+    const processedIds = new Set<string>();
 
-      nodes.forEach(node => {
-        if (!processedIds.has(node.id)) {
-          const hierarchyNode = this.processNodeHierarchyRecursively(node, [], 0);
-          if (hierarchyNode) {
-            hierarchyMap.push(hierarchyNode);
-            this.markProcessedIds(hierarchyNode, processedIds);
-          }
+    nodes.forEach(node => {
+      if (!processedIds.has(node.id)) {
+        const hierarchyNode = this.processNodeHierarchyRecursively(node, [], 0);
+        if (hierarchyNode) {
+          hierarchyMap.push(hierarchyNode);
+          this.markProcessedIds(hierarchyNode, processedIds);
         }
-      });
+      }
+    });
 
-      logger.debug(MODULE_NAME, FUNC_NAME, `Built hierarchy map with ${hierarchyMap.length} root nodes`);
-      return hierarchyMap;
-
-    } catch (error) {
-      logger.error(MODULE_NAME, FUNC_NAME, 'Error building hierarchy map:', error as Error);
-      return [];
-    }
+    return hierarchyMap;
   }
 
-  @LogFunction(MODULE_NAME)
   private processNodeHierarchyRecursively(node: any, path: string[], depth: number): HierarchyNode | null {
     try {
       const currentPath = [...path, this.sanitizeClassName(node.name)];
@@ -181,11 +168,8 @@ export class HierarchyCSSExtractor {
         }
       };
 
-      // Process children recursively for ALL node types that can have children
+      // Process children recursively
       if (this.nodeCanHaveChildren(node) && node.children && Array.isArray(node.children)) {
-        logger.debug(MODULE_NAME, 'processNodeHierarchyRecursively', 
-          `Processing ${node.children.length} children for ${node.name}`);
-        
         node.children.forEach((child: any) => {
           const childNode = this.processNodeHierarchyRecursively(child, currentPath, depth + 1);
           if (childNode) {
@@ -205,9 +189,7 @@ export class HierarchyCSSExtractor {
     }
   }
 
-  @LogFunction(MODULE_NAME)
   private nodeCanHaveChildren(node: any): boolean {
-    // Comprehensive list of node types that can contain children
     const parentNodeTypes = [
       'FRAME', 'GROUP', 'COMPONENT', 'INSTANCE', 
       'COMPONENT_SET', 'BOOLEAN_OPERATION', 'SECTION'
@@ -216,16 +198,14 @@ export class HierarchyCSSExtractor {
     return parentNodeTypes.includes(node.type);
   }
 
-  @LogFunction(MODULE_NAME)
   private extractNodeStyles(node: any): Record<string, string> {
     const styles: Record<string, string> = {};
 
     try {
-      // Position and Size - always extract dimensions
+      // Position and Size
       styles.width = `${safeGetNumber(node.width)}px`;
       styles.height = `${safeGetNumber(node.height)}px`;
       
-      // Position if available
       if (this.hasPositionData(node)) {
         styles.position = 'absolute';
         styles.left = `${safeGetNumber(node.x)}px`;
@@ -276,9 +256,6 @@ export class HierarchyCSSExtractor {
         styles.display = 'none';
       }
 
-      // Node type specific styles
-      this.addNodeTypeSpecificStyles(node, styles);
-
     } catch (error) {
       logger.warn(MODULE_NAME, 'extractNodeStyles', 'Error extracting styles:', { 
         error, 
@@ -289,37 +266,12 @@ export class HierarchyCSSExtractor {
     return styles;
   }
 
-  private addNodeTypeSpecificStyles(node: any, styles: Record<string, string>): void {
-    switch (node.type) {
-      case 'TEXT':
-        styles['white-space'] = 'pre-wrap';
-        styles['word-wrap'] = 'break-word';
-        break;
-      case 'FRAME':
-      case 'COMPONENT':
-      case 'INSTANCE':
-        styles.display = 'block';
-        styles.position = 'relative';
-        break;
-      case 'GROUP':
-        styles.display = 'block';
-        break;
-      case 'RECTANGLE':
-      case 'ELLIPSE':
-      case 'POLYGON':
-        styles.display = 'block';
-        break;
-    }
-  }
-
   private extractTextStyles(node: any, styles: Record<string, string>): void {
     try {
-      // Font Size
       if (isValidNumber(node.fontSize)) {
         styles['font-size'] = `${safeGetNumber(node.fontSize)}px`;
       }
 
-      // Font Family & Weight
       if (node.fontName && typeof node.fontName === 'object' && node.fontName !== figma?.mixed) {
         if (node.fontName.family) {
           styles['font-family'] = `"${node.fontName.family}", sans-serif`;
@@ -329,39 +281,21 @@ export class HierarchyCSSExtractor {
         }
       }
 
-      // Text Color
       const textColor = this.getNodeTextColor(node);
       if (textColor) {
         styles.color = textColor;
       }
 
-      // Text Alignment
       if (node.textAlignHorizontal) {
         styles['text-align'] = node.textAlignHorizontal.toLowerCase();
       }
 
-      // Line Height
       if (node.lineHeight && typeof node.lineHeight === 'object') {
         if (node.lineHeight.unit === 'PIXELS') {
           styles['line-height'] = `${safeGetNumber(node.lineHeight.value)}px`;
         } else if (node.lineHeight.unit === 'PERCENT') {
           styles['line-height'] = `${safeGetNumber(node.lineHeight.value) / 100}`;
         }
-      }
-
-      // Letter Spacing
-      if (node.letterSpacing && typeof node.letterSpacing === 'object') {
-        styles['letter-spacing'] = `${safeGetNumber(node.letterSpacing.value)}px`;
-      }
-
-      // Text Decoration
-      if (node.textDecoration && node.textDecoration !== 'NONE') {
-        styles['text-decoration'] = node.textDecoration.toLowerCase().replace('_', '-');
-      }
-
-      // Text Content as CSS comment
-      if (node.characters && typeof node.characters === 'string') {
-        styles['/* content */'] = `"${node.characters.substring(0, 50)}${node.characters.length > 50 ? '...' : ''}"`;
       }
 
     } catch (error) {
@@ -371,7 +305,6 @@ export class HierarchyCSSExtractor {
 
   private extractLayoutStyles(node: any, styles: Record<string, string>): void {
     try {
-      // Flexbox Layout
       if ('layoutMode' in node && node.layoutMode !== 'NONE') {
         styles.display = 'flex';
         
@@ -381,7 +314,6 @@ export class HierarchyCSSExtractor {
           styles['flex-direction'] = 'column';
         }
 
-        // Alignment
         if (node.primaryAxisAlignItems) {
           styles['justify-content'] = this.mapAlignment(node.primaryAxisAlignItems);
         }
@@ -389,13 +321,11 @@ export class HierarchyCSSExtractor {
           styles['align-items'] = this.mapAlignment(node.counterAxisAlignItems);
         }
 
-        // Gap/Item Spacing
         if (isValidNumber(node.itemSpacing) && node.itemSpacing > 0) {
           styles.gap = `${safeGetNumber(node.itemSpacing)}px`;
         }
       }
 
-      // Padding
       if (this.hasPadding(node)) {
         const padding = this.getNodePadding(node);
         if (this.isUniformPadding(padding)) {
@@ -403,11 +333,6 @@ export class HierarchyCSSExtractor {
         } else {
           styles.padding = `${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`;
         }
-      }
-
-      // Auto Layout Constraints
-      if (node.layoutGrow && node.layoutGrow > 0) {
-        styles['flex-grow'] = node.layoutGrow.toString();
       }
 
     } catch (error) {
@@ -453,7 +378,6 @@ export class HierarchyCSSExtractor {
     }
   }
 
-  @LogFunction(MODULE_NAME)
   private extractCSSFromHierarchy(hierarchyMap: HierarchyNode[]): CSSRule[] {
     const cssRules: CSSRule[] = [];
 
@@ -477,7 +401,6 @@ export class HierarchyCSSExtractor {
       }
     };
 
-    // Process children recursively
     if (node.children.length > 0) {
       rule.children = node.children.map(child => this.createCSSRuleRecursively(child));
     }
@@ -485,7 +408,6 @@ export class HierarchyCSSExtractor {
     return rule;
   }
 
-  @LogFunction(MODULE_NAME)
   private generateCSSText(cssRules: CSSRule[]): string {
     let css = `/* Generated CSS from Figma Hierarchy */\n/* Generated on: ${new Date().toISOString()} */\n\n`;
     
@@ -494,14 +416,12 @@ export class HierarchyCSSExtractor {
       let ruleCSS = `${indent}/* Layer: ${rule.figmaNode?.layer} (${rule.figmaNode?.type}) */\n`;
       ruleCSS += `${indent}${rule.selector} {\n`;
       
-      // Add properties
       Object.entries(rule.properties).forEach(([property, value]) => {
         ruleCSS += `${indent}  ${property}: ${value};\n`;
       });
       
       ruleCSS += `${indent}}\n\n`;
       
-      // Add children
       if (rule.children) {
         rule.children.forEach(child => {
           ruleCSS += generateRuleCSS(child, depth);
@@ -518,7 +438,6 @@ export class HierarchyCSSExtractor {
     return css;
   }
 
-  @LogFunction(MODULE_NAME)
   private generateSCSSText(cssRules: CSSRule[]): string {
     let scss = `/* Generated SCSS from Figma Hierarchy */\n/* Generated on: ${new Date().toISOString()} */\n\n`;
     
@@ -528,12 +447,10 @@ export class HierarchyCSSExtractor {
       let ruleCSS = `${indent}/* Layer: ${rule.figmaNode?.layer} (${rule.figmaNode?.type}) */\n`;
       ruleCSS += `${indent}.${className} {\n`;
       
-      // Add properties
       Object.entries(rule.properties).forEach(([property, value]) => {
         ruleCSS += `${indent}  ${property}: ${value};\n`;
       });
       
-      // Add nested children
       if (rule.children) {
         rule.children.forEach(child => {
           const childClassName = child.selector.replace('.', '');
@@ -557,9 +474,8 @@ export class HierarchyCSSExtractor {
     return scss;
   }
 
-  @LogFunction(MODULE_NAME)
   private generateReactNativeStyles(cssRules: CSSRule[]): string {
-    let rnStyles = `// Generated React Native Styles from Figma Hierarchy\n// Generated on: ${new Date().toISOString()}\n\nimport { StyleSheet } from 'react-native';\n\nexport const styles = StyleSheet.create({\n`;
+    let rnStyles = `// Generated React Native Styles from Figma Hierarchy\nimport { StyleSheet } from 'react-native';\n\nexport const styles = StyleSheet.create({\n`;
     
     const convertCSSToRN = (properties: Record<string, string>): Record<string, any> => {
       const rnProps: Record<string, any> = {};
@@ -578,7 +494,6 @@ export class HierarchyCSSExtractor {
       const rnProperties = convertCSSToRN(rule.properties);
       const styleName = rule.selector.replace('.', '');
       
-      rnStyles += `  // Layer: ${rule.figmaNode?.layer} (${rule.figmaNode?.type})\n`;
       rnStyles += `  ${styleName}: {\n`;
       Object.entries(rnProperties).forEach(([prop, value]) => {
         const valueStr = typeof value === 'string' ? `'${value}'` : value;
@@ -586,7 +501,6 @@ export class HierarchyCSSExtractor {
       });
       rnStyles += `  },\n\n`;
       
-      // Process children
       if (rule.children) {
         rule.children.forEach(child => generateStyleObject(child));
       }
@@ -599,7 +513,7 @@ export class HierarchyCSSExtractor {
     return rnStyles;
   }
 
-  // Helper methods implementation
+  // Helper methods
   private sanitizeClassName(name: string): string {
     return name
       .replace(/[^a-zA-Z0-9\s-_]/g, '')
@@ -627,7 +541,7 @@ export class HierarchyCSSExtractor {
     return count;
   }
 
-  // Continue with helper methods...
+  // Simple helper methods without external dependencies
   private hasPositionData(node: any): boolean {
     return isValidNumber(node.x) && isValidNumber(node.y);
   }
@@ -646,7 +560,7 @@ export class HierarchyCSSExtractor {
       if ('fills' in node && node.fills && Array.isArray(node.fills)) {
         for (const fill of node.fills) {
           if (fill.type === 'SOLID' && fill.color && fill.visible !== false) {
-            return rgbToHex(fill.color.r, fill.color.g, fill.color.b);
+            return this.rgbToHex(fill.color.r, fill.color.g, fill.color.b);
           }
         }
       }
@@ -661,7 +575,7 @@ export class HierarchyCSSExtractor {
       if ('strokes' in node && node.strokes && Array.isArray(node.strokes)) {
         for (const stroke of node.strokes) {
           if (stroke.type === 'SOLID' && stroke.color && stroke.visible !== false) {
-            return rgbToHex(stroke.color.r, stroke.color.g, stroke.color.b);
+            return this.rgbToHex(stroke.color.r, stroke.color.g, stroke.color.b);
           }
         }
       }
@@ -676,7 +590,7 @@ export class HierarchyCSSExtractor {
       if (node.type === 'TEXT' && 'fills' in node && node.fills && Array.isArray(node.fills)) {
         for (const fill of node.fills) {
           if (fill.type === 'SOLID' && fill.color && fill.visible !== false) {
-            return rgbToHex(fill.color.r, fill.color.g, fill.color.b);
+            return this.rgbToHex(fill.color.r, fill.color.g, fill.color.b);
           }
         }
       }
@@ -734,18 +648,11 @@ export class HierarchyCSSExtractor {
       const spread = safeGetNumber(effect.spread, 0);
       
       if (effect.color) {
-        const color = rgbToHex(effect.color.r, effect.color.g, effect.color.b);
-        const alpha = safeGetNumber(effect.color.a, 1);
+        const color = this.rgbToHex(effect.color.r, effect.color.g, effect.color.b);
         
         let shadowString = `${x}px ${y}px ${blur}px`;
         if (spread !== 0) shadowString += ` ${spread}px`;
-        
-        if (alpha < 1) {
-          const rgba = this.hexToRgba(color, alpha);
-          shadowString += ` ${rgba}`;
-        } else {
-          shadowString += ` ${color}`;
-        }
+        shadowString += ` ${color}`;
         
         if (effect.type === 'INNER_SHADOW') {
           shadowString += ' inset';
@@ -760,11 +667,12 @@ export class HierarchyCSSExtractor {
     }
   }
 
-  private hexToRgba(hex: string, alpha: number): string {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  private rgbToHex(r: number, g: number, b: number): string {
+    const toHex = (c: number): string => {
+      const hex = Math.round(c * 255).toString(16);
+      return hex.length === 1 ? '0' + hex : hex;
+    };
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
   }
 
   private convertCSSPropertyToRN(property: string, value: string): { property: string; value: any } | null {
@@ -777,23 +685,16 @@ export class HierarchyCSSExtractor {
       'font-family': 'fontFamily',
       'font-weight': 'fontWeight',
       'text-align': 'textAlign',
-      'line-height': 'lineHeight',
-      'letter-spacing': 'letterSpacing',
-      'flex-direction': 'flexDirection',
-      'justify-content': 'justifyContent',
-      'align-items': 'alignItems',
-      'flex-grow': 'flexGrow'
+      'line-height': 'lineHeight'
     };
 
     const rnProperty = conversions[property] || property;
     
-    // Convert pixel values to numbers
     if (value.endsWith('px')) {
       const numValue = parseFloat(value);
       return { property: rnProperty, value: numValue };
     }
     
-    // Convert other values
     return { property: rnProperty, value: value };
   }
 

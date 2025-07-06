@@ -1,10 +1,29 @@
 // src/detectors/component-detector.ts
-// Component type detection with extensive logging and safe property access
+// Fixed to remove missing dependencies
 
 import { logger, LogFunction } from '@core/logger';
-import { safeGetNumber, safeGetWidth, safeGetHeight, safeGetCornerRadius } from '@utils/number-utils';
 
 const MODULE_NAME = 'ComponentDetector';
+
+// Simple safe number utility (avoiding import)
+function safeGetNumber(value: any, defaultValue: number = 0): number {
+  if (typeof value === 'number' && !isNaN(value) && isFinite(value)) {
+    return value;
+  }
+  return defaultValue;
+}
+
+function safeGetWidth(node: any): number {
+  return safeGetNumber(node.width, 0);
+}
+
+function safeGetHeight(node: any): number {
+  return safeGetNumber(node.height, 0);
+}
+
+function safeGetCornerRadius(node: any): number {
+  return safeGetNumber(node.cornerRadius, 0);
+}
 
 export interface ComponentDetectionResult {
   isButton: boolean;
