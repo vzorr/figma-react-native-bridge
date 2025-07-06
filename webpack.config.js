@@ -16,10 +16,10 @@ module.exports = (env, argv) => {
     
     resolve: {
       extensions: ['.ts', '.js'],
-      // Remove complex aliases that reference missing directories
       alias: {
         '@core': path.resolve(__dirname, 'src/core'),
         '@utils': path.resolve(__dirname, 'src/utils'),
+        '@handlers': path.resolve(__dirname, 'src/handlers'),
       },
     },
     
@@ -42,11 +42,12 @@ module.exports = (env, argv) => {
     },
     
     plugins: [
-      // CRITICAL: Figma-compatible HTML injection
+      // CRITICAL: Figma-compatible HTML injection with enhanced UI
       new webpack.DefinePlugin({
         '__html__': JSON.stringify(
           (() => {
             try {
+              // Use the enhanced UI HTML file
               const uiHtmlPath = path.resolve(__dirname, 'src/ui.html');
               
               if (!fs.existsSync(uiHtmlPath)) {
@@ -100,54 +101,11 @@ module.exports = (env, argv) => {
         ),
       }),
       
-      // Simple file copy plugin (optional files)
-      {
-        apply: (compiler) => {
-          compiler.hooks.emit.tapAsync('CopyUIFilesPlugin', (compilation, callback) => {
-            try {
-              const srcDir = path.resolve(__dirname, 'src');
-              
-              // Only copy files that actually exist
-              const possibleFiles = ['ui.html', 'styles.css', 'script.js'];
-              
-              possibleFiles.forEach(fileName => {
-                const filePath = path.join(srcDir, fileName);
-                if (fs.existsSync(filePath)) {
-                  try {
-                    const content = fs.readFileSync(filePath, 'utf8');
-                    compilation.assets[fileName] = {
-                      source: () => content,
-                      size: () => content.length,
-                    };
-                    console.log(`✅ ${fileName} copied to dist`);
-                  } catch (readError) {
-                    console.warn(`⚠️  Could not read ${fileName}:`, readError.message);
-                  }
-                }
-              });
-              
-            } catch (error) {
-              console.error('❌ Error in CopyUIFilesPlugin:', error.message);
-            }
-            callback();
-          });
-        },
-      },
-      
-      new webpack.BannerPlugin({
-        banner: `/**
- * Figma React Native Bridge Plugin
- * Built: ${new Date().toISOString()}
- * Mode: ${argv.mode || 'development'}
- */`,
-        raw: false,
-      }),
-      
-      // Simple validation plugin
+      // Enhanced validation plugin for layer list functionality
       {
         apply: (compiler) => {
           compiler.hooks.done.tap('ValidationPlugin', (stats) => {
-            console.log('\n🔍 Build validation...');
+            console.log('\n🔍 Build validation with Layer List support...');
             
             if (stats.compilation.errors.length > 0) {
               console.log('❌ Build errors found:');
@@ -176,6 +134,18 @@ module.exports = (env, argv) => {
                   console.log('✅ Figma API calls detected');
                 }
                 
+                if (content.includes('LayerListHandler')) {
+                  console.log('✅ Layer List functionality included');
+                }
+                
+                if (content.includes('LIST_ALL_LAYERS')) {
+                  console.log('✅ Layer listing messages detected');
+                }
+                
+                if (content.includes('EXTRACT_SELECTED_LAYERS')) {
+                  console.log('✅ Selective extraction functionality included');
+                }
+                
               } catch (readError) {
                 console.log('⚠️  Could not analyze output file');
               }
@@ -183,7 +153,7 @@ module.exports = (env, argv) => {
               console.log('❌ code.js not found');
             }
             
-            console.log('🚀 Build completed!');
+            console.log('🚀 Layer List build completed!');
           });
         },
       },

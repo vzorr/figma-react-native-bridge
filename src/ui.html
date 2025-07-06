@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Figma React Native Bridge - Complete Hierarchy CSS Extractor</title>
+  <title>Figma Layer CSS Extractor</title>
   <style>
 * { 
   box-sizing: border-box; 
@@ -25,7 +25,7 @@ body {
   flex-direction: column;
 }
 
-/* Header with breadcrumbs */
+/* Header */
 .header {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
@@ -58,11 +58,6 @@ body {
   background: rgba(255,255,255,0.1);
 }
 
-.breadcrumb-separator {
-  opacity: 0.6;
-}
-
-/* Progress bar */
 .progress-bar {
   width: 100%;
   height: 4px;
@@ -80,35 +75,71 @@ body {
   border-radius: 2px;
 }
 
-/* Main content area */
+/* Tab Navigation */
+.tab-navigation {
+  background: white;
+  border-bottom: 1px solid #e1e8ed;
+  display: flex;
+}
+
+.tab-button {
+  padding: 12px 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.tab-button:hover {
+  background: #f8f9fa;
+}
+
+.tab-button.active {
+  border-bottom-color: #667eea;
+  color: #667eea;
+  background: #f8f9ff;
+}
+
+/* Content Area */
 .content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-content {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
+  display: none;
 }
 
-/* Dashboard View */
-.dashboard {
-  max-width: 100%;
+.tab-content.active {
+  display: block;
 }
 
-.dashboard-header {
+/* Layer List View */
+.layer-list-container {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
+  flex-direction: column;
+  height: 100%;
 }
 
-.dashboard-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: #333;
-  margin: 0;
+.layer-controls {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e1e8ed;
+  padding: 16px;
+  margin-bottom: 16px;
 }
 
-.dashboard-stats {
+.layer-stats {
   display: flex;
   gap: 16px;
+  margin-bottom: 12px;
   font-size: 12px;
   color: #666;
 }
@@ -119,56 +150,192 @@ body {
   gap: 4px;
 }
 
-/* Refresh button */
-.refresh-button {
-  background: rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.2);
+.layer-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.button {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
-  padding: 4px 8px;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.button.secondary {
+  background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+}
+
+/* Layer Tree */
+.layer-tree {
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e1e8ed;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.layer-tree-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #e1e8ed;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.selection-count {
+  font-size: 11px;
+  color: #666;
+  font-weight: normal;
+}
+
+.layer-tree-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  margin: 1px 0;
   border-radius: 4px;
   cursor: pointer;
-  font-size: 11px;
-  margin-left: 8px;
   transition: all 0.2s;
+  font-size: 12px;
+  position: relative;
 }
 
-.refresh-button:hover {
-  background: rgba(255,255,255,0.2);
+.layer-item:hover {
+  background: #f8f9fa;
 }
 
-/* Action Grid */
-.action-grid {
+.layer-item.selected {
+  background: #e3f2fd;
+  border: 1px solid #2196f3;
+}
+
+.layer-indent {
+  width: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.layer-expand-toggle {
+  width: 12px;
+  height: 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #666;
+}
+
+.layer-expand-toggle:hover {
+  background: #e0e0e0;
+  border-radius: 2px;
+}
+
+.layer-icon {
+  font-size: 14px;
+  margin-right: 6px;
+  min-width: 16px;
+}
+
+.layer-name {
+  flex: 1;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.layer-type {
+  font-size: 10px;
+  color: #666;
+  padding: 2px 6px;
+  background: #f0f0f0;
+  border-radius: 8px;
+  margin-left: 8px;
+}
+
+.layer-dimensions {
+  font-size: 10px;
+  color: #999;
+  margin-left: 8px;
+}
+
+.layer-visibility {
+  margin-left: 8px;
+  font-size: 10px;
+  color: #999;
+}
+
+.layer-checkbox {
+  margin-right: 8px;
+  width: 14px;
+  height: 14px;
+}
+
+/* Quick Extract View */
+.quick-extract {
+  max-width: 100%;
+}
+
+.extract-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 20px;
-  margin: 20px 0;
+  grid-template-columns: 1fr;
+  gap: 16px;
 }
 
-.action-card {
+.extract-card {
   background: white;
   border-radius: 12px;
   border: 1px solid #e1e8ed;
   padding: 20px;
   cursor: pointer;
   transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
 }
 
-.action-card:hover {
+.extract-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(102, 126, 234, 0.15);
   border-color: #667eea;
 }
 
-.action-card-header {
+.extract-card-header {
   display: flex;
   align-items: center;
   gap: 12px;
   margin-bottom: 12px;
 }
 
-.action-icon {
+.extract-icon {
   font-size: 24px;
   width: 40px;
   height: 40px;
@@ -180,131 +347,21 @@ body {
   color: white;
 }
 
-.action-title {
+.extract-title {
   font-size: 16px;
   font-weight: 600;
   color: #333;
   margin: 0;
 }
 
-.action-description {
+.extract-description {
   font-size: 13px;
   color: #666;
   line-height: 1.5;
   margin-bottom: 16px;
 }
 
-.action-features {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 16px;
-}
-
-.feature-tag {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  padding: 4px 8px;
-  border-radius: 12px;
-  font-size: 10px;
-  color: #666;
-}
-
-.action-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 10px 16px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  width: 100%;
-  transition: all 0.2s ease;
-}
-
-.action-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-}
-
-.action-button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
-
-/* CSS Extraction Options */
-.css-options {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  padding: 16px;
-  margin-top: 12px;
-  display: none;
-}
-
-.css-options.show {
-  display: block;
-}
-
-.css-options-title {
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 12px;
-  color: #333;
-}
-
-.css-format-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.format-option {
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 4px;
-  padding: 8px 12px;
-  cursor: pointer;
-  text-align: center;
-  font-size: 11px;
-  transition: all 0.2s;
-}
-
-.format-option:hover {
-  border-color: #667eea;
-  background: #f8f9ff;
-}
-
-.format-option.selected {
-  border-color: #667eea;
-  background: #667eea;
-  color: white;
-}
-
-.css-advanced-options {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.checkbox-option {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-}
-
-.checkbox-option input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-}
-
-/* Loading and error states */
+/* Loading states */
 .loading { 
   text-align: center; 
   padding: 64px 20px; 
@@ -345,7 +402,7 @@ body {
   border: 1px solid #cfc;
 }
 
-/* Modal styles for results */
+/* Results Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -439,20 +496,6 @@ body {
   max-height: 400px;
 }
 
-.hierarchy-preview {
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  padding: 16px;
-  font-family: monospace;
-  font-size: 11px;
-  line-height: 1.4;
-  white-space: pre;
-  overflow-x: auto;
-  max-height: 300px;
-}
-
-/* Export options */
 .export-options {
   margin-top: 16px;
   padding: 16px;
@@ -487,6 +530,33 @@ body {
   border-color: #667eea;
   background: #f8f9ff;
 }
+
+/* Empty states */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+}
+
+.empty-state-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.empty-state-description {
+  font-size: 13px;
+  line-height: 1.5;
+  max-width: 300px;
+  margin: 0 auto;
+}
   </style>
 </head>
 <body>
@@ -495,9 +565,9 @@ body {
     <div class="header">
       <div style="display: flex; justify-content: space-between; align-items: flex-start;">
         <div>
-          <h1 id="headerTitle">🎨 Complete Hierarchy CSS Extractor</h1>
+          <h1 id="headerTitle">🎨 Layer CSS Extractor</h1>
           <div class="breadcrumb" id="breadcrumb">
-            <span class="breadcrumb-item">Extract CSS from ALL Figma layers with hierarchy preservation</span>
+            <span class="breadcrumb-item">Browse and extract CSS from specific Figma layers</span>
           </div>
         </div>
       </div>
@@ -506,111 +576,113 @@ body {
       </div>
     </div>
     
-    <!-- Main content area -->
-    <div class="content" id="mainContent">
+    <!-- Tab Navigation -->
+    <div class="tab-navigation">
+      <button class="tab-button active" onclick="switchTab('layer-list')" id="layerListTab">
+        📋 Layer Browser
+      </button>
+      <button class="tab-button" onclick="switchTab('quick-extract')" id="quickExtractTab">
+        ⚡ Quick Extract
+      </button>
+    </div>
+    
+    <!-- Content Area -->
+    <div class="content">
       
-      <!-- Dashboard View -->
-      <div id="dashboardView" class="dashboard">
-        <div class="dashboard-header">
-          <h2 class="dashboard-title">Complete Hierarchy CSS Extraction</h2>
-          <div class="dashboard-stats" id="dashboardStats">
-            <div class="stat-item" id="selectionStatus">
-              <span>📌</span>
-              <span>No selection</span>
-              <button class="refresh-button" onclick="refreshSelection()">🔄 Refresh</button>
-            </div>
-          </div>
-        </div>
-        
-        <!-- Action Grid -->
-        <div class="action-grid">
+      <!-- Layer List Tab -->
+      <div class="tab-content active" id="layer-list">
+        <div class="layer-list-container">
           
-          <!-- Hierarchy CSS Extraction Card -->
-          <div class="action-card" onclick="toggleCSSOptions()">
-            <div class="action-card-header">
-              <div class="action-icon">🎨</div>
-              <h3 class="action-title">Complete Hierarchy CSS Extraction</h3>
-            </div>
-            <div class="action-description">
-              Extract CSS from <strong>ALL layers and sub-items</strong> while preserving exact Figma hierarchy. Processes every single element in your selection including all nested children with complete layer structure preservation.
-            </div>
-            <div class="action-features">
-              <span class="feature-tag">Complete hierarchy</span>
-              <span class="feature-tag">ALL child nodes</span>
-              <span class="feature-tag">CSS/SCSS/React Native</span>
-              <span class="feature-tag">Auto class names</span>
-              <span class="feature-tag">Layer relationships</span>
-              <span class="feature-tag">Full Figma structure</span>
-            </div>
-            
-            <!-- CSS Options Panel -->
-            <div class="css-options" id="cssOptions">
-              <div class="css-options-title">🎯 CSS Extraction Options</div>
-              
-              <div class="css-format-options">
-                <div class="format-option selected" data-format="all">
-                  🌟 All Formats
-                </div>
-                <div class="format-option" data-format="scss">
-                  🎨 SCSS Only
-                </div>
-                <div class="format-option" data-format="react-native">
-                  📱 React Native
-                </div>
-                <div class="format-option" data-format="css">
-                  📄 CSS Only
-                </div>
+          <!-- Layer Controls -->
+          <div class="layer-controls">
+            <div class="layer-stats" id="layerStats">
+              <div class="stat-item">
+                <span>📄</span>
+                <span id="totalLayersCount">0 layers</span>
               </div>
-              
-              <div class="css-advanced-options">
-                <label class="checkbox-option">
-                  <input type="checkbox" id="preservePositioning" checked>
-                  <span>Preserve absolute positioning</span>
-                </label>
-                <label class="checkbox-option">
-                  <input type="checkbox" id="includeHidden">
-                  <span>Include hidden layers</span>
-                </label>
-                <label class="checkbox-option">
-                  <input type="checkbox" id="semanticNames" checked>
-                  <span>Generate semantic class names</span>
-                </label>
-                <label class="checkbox-option">
-                  <input type="checkbox" id="responsiveTokens" checked>
-                  <span>Create responsive design tokens</span>
-                </label>
+              <div class="stat-item">
+                <span>👁️</span>
+                <span id="visibleLayersCount">0 visible</span>
+              </div>
+              <div class="stat-item">
+                <span>🎨</span>
+                <span id="styledLayersCount">0 with styles</span>
               </div>
             </div>
             
-            <button class="action-button" onclick="extractHierarchyCSS(event)">
-              🚀 Extract Complete Hierarchy CSS
-            </button>
+            <div class="layer-actions">
+              <button class="button" onclick="listAllLayers()" id="listLayersBtn">
+                🔍 Scan All Layers
+              </button>
+              <button class="button secondary" onclick="extractSelectedLayers()" id="extractSelectedBtn" disabled>
+                🎨 Extract Selected CSS
+              </button>
+              <button class="button secondary" onclick="selectAllLayers()" id="selectAllBtn" disabled>
+                ☑️ Select All
+              </button>
+              <button class="button secondary" onclick="clearSelection()" id="clearSelectionBtn" disabled>
+                🗑️ Clear Selection
+              </button>
+            </div>
+          </div>
+          
+          <!-- Layer Tree -->
+          <div class="layer-tree">
+            <div class="layer-tree-header">
+              <span>📁 Figma Layers</span>
+              <span class="selection-count" id="selectionCount">0 selected</span>
+            </div>
+            <div class="layer-tree-content" id="layerTreeContent">
+              <div class="empty-state">
+                <div class="empty-state-icon">📂</div>
+                <div class="empty-state-title">No Layers Loaded</div>
+                <div class="empty-state-description">
+                  Click "Scan All Layers" to browse your Figma design structure and select specific layers for CSS extraction.
+                </div>
+              </div>
+            </div>
           </div>
           
         </div>
-        
-        <!-- Info Panel -->
-        <div style="background: #e8f4fd; border: 1px solid #bee5eb; border-radius: 8px; padding: 16px; margin-top: 20px;">
-          <h4 style="margin: 0 0 8px 0; color: #0c5460;">📋 How It Works</h4>
-          <ul style="margin: 0; padding-left: 20px; font-size: 12px; color: #0c5460; line-height: 1.5;">
-            <li><strong>No Selection:</strong> Processes all frames on current page</li>
-            <li><strong>With Selection:</strong> Processes selected frames and ALL their children</li>
-            <li><strong>Complete Hierarchy:</strong> Every single layer and sub-layer is extracted</li>
-            <li><strong>Multiple Formats:</strong> CSS, SCSS, React Native styles, and documentation</li>
-            <li><strong>Preserves Structure:</strong> Maintains exact Figma layer relationships</li>
-          </ul>
-        </div>
-        
-        <!-- Status Messages -->
-        <div id="statusMessage"></div>
       </div>
       
-      <!-- Loading View -->
-      <div id="loadingView" class="loading" style="display: none;">
-        <div class="loading-spinner"></div>
-        <div id="loadingMessage">Processing your Figma design...</div>
-        <div id="loadingProgress" style="margin-top: 12px; font-size: 11px; color: #888;"></div>
+      <!-- Quick Extract Tab -->
+      <div class="tab-content" id="quick-extract">
+        <div class="quick-extract">
+          <div class="extract-grid">
+            
+            <!-- All Layers Extract -->
+            <div class="extract-card" onclick="extractAllLayers()">
+              <div class="extract-card-header">
+                <div class="extract-icon">🌟</div>
+                <h3 class="extract-title">Extract All Layers</h3>
+              </div>
+              <div class="extract-description">
+                Extract CSS from all visible layers in the current page with complete hierarchy preservation. Perfect for getting the full design structure.
+              </div>
+              <button class="button" style="width: 100%;">
+                🚀 Extract Complete CSS
+              </button>
+            </div>
+            
+            <!-- Current Selection Extract -->
+            <div class="extract-card" onclick="extractCurrentSelection()">
+              <div class="extract-card-header">
+                <div class="extract-icon">🎯</div>
+                <h3 class="extract-title">Extract Current Selection</h3>
+              </div>
+              <div class="extract-description">
+                Extract CSS only from your currently selected layers in Figma. Includes all children and maintains layer relationships.
+              </div>
+              <button class="button" style="width: 100%;">
+                🎨 Extract Selection CSS
+              </button>
+            </div>
+            
+          </div>
+        </div>
       </div>
+      
     </div>
   </div>
   
@@ -618,7 +690,7 @@ body {
   <div class="modal-overlay" id="resultsModal">
     <div class="modal">
       <div class="modal-header">
-        <h3 class="modal-title" id="modalTitle">Complete Hierarchy Extraction Results</h3>
+        <h3 class="modal-title" id="modalTitle">CSS Extraction Results</h3>
         <button class="modal-close" onclick="closeModal()">&times;</button>
       </div>
       
@@ -631,12 +703,6 @@ body {
         <!-- File content will be displayed here -->
         <div id="fileContent"></div>
         
-        <!-- Hierarchy preview for CSS extraction -->
-        <div id="hierarchyPreview" style="display: none;">
-          <h4>📁 Complete Layer Hierarchy</h4>
-          <div class="hierarchy-preview" id="hierarchyVisualization"></div>
-        </div>
-        
         <!-- Export options -->
         <div class="export-options">
           <div class="export-title">📥 Download Options</div>
@@ -648,186 +714,276 @@ body {
     </div>
   </div>
 
+  <!-- Status Messages -->
+  <div id="statusMessage"></div>
+
   <script>
     // Global state
-    let currentExtractionData = null;
-    let selectedFormat = 'all';
-    let activeFileTab = null;
+    let currentTab = 'layer-list';
+    let layerData = null;
+    let selectedLayerIds = new Set();
+    let extractionResults = null;
 
     // Initialize the plugin
     document.addEventListener('DOMContentLoaded', function() {
-      updateSelectionStatus();
-      setupEventListeners();
+      console.log('UI initialized');
       
-      // Check for any pending operations and get initial selection
+      // Send ready message to plugin
       parent.postMessage({ 
         pluginMessage: { 
           type: 'PLUGIN_READY',
           timestamp: Date.now()
         } 
       }, '*');
-      
-      // Auto-refresh selection every 2 seconds if no event handler
-      setInterval(() => {
-        refreshSelection();
-      }, 2000);
     });
 
-    function setupEventListeners() {
-      // CSS format selection
-      document.querySelectorAll('.format-option').forEach(option => {
-        option.addEventListener('click', function(e) {
-          e.stopPropagation();
-          selectFormat(this.getAttribute('data-format'));
-        });
-      });
-
-      // Listen for messages from plugin
-      window.addEventListener('message', function(event) {
-        const { type, data } = event.data.pluginMessage || {};
-        
-        switch (type) {
-          case 'SELECTION_CHANGED':
-            updateSelectionStatus(data);
-            break;
-          case 'PROGRESS_UPDATE':
-            updateProgress(data);
-            break;
-          case 'EXTRACTION_COMPLETE':
-            handleExtractionComplete(data);
-            break;
-          case 'ERROR':
-            showError(data.message);
-            break;
-          case 'SUCCESS':
-            showSuccess(data.message);
-            break;
-        }
-      });
-    }
-
-    function toggleCSSOptions() {
-      const options = document.getElementById('cssOptions');
-      options.classList.toggle('show');
-    }
-
-    function selectFormat(format) {
-      selectedFormat = format;
+    // Tab switching
+    function switchTab(tabId) {
+      // Update tab buttons
+      document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(tabId === 'layer-list' ? 'layerListTab' : 'quickExtractTab').classList.add('active');
       
-      // Update UI
-      document.querySelectorAll('.format-option').forEach(option => {
-        option.classList.remove('selected');
-      });
-      document.querySelector(`[data-format="${format}"]`).classList.add('selected');
+      // Update tab content
+      document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      
+      currentTab = tabId;
     }
 
-    function refreshSelection() {
+    // Layer listing functionality
+    function listAllLayers() {
+      showLoading('🔍 Scanning all layers in your design...');
+      
       parent.postMessage({ 
         pluginMessage: { 
-          type: 'CHECK_SELECTION',
+          type: 'LIST_ALL_LAYERS',
           timestamp: Date.now()
         } 
       }, '*');
     }
 
-    function extractHierarchyCSS(event) {
-      if (event) event.stopPropagation();
+    function displayLayerTree(data) {
+      layerData = data;
       
-      const options = {
-        format: selectedFormat,
-        preserveAbsolutePositioning: document.getElementById('preservePositioning').checked,
-        includeHiddenLayers: document.getElementById('includeHidden').checked,
-        generateClassNames: document.getElementById('semanticNames').checked ? 'semantic' : 'minimal',
-        responsiveTokens: document.getElementById('responsiveTokens').checked
-      };
+      // Update stats
+      updateLayerStats(data.summary);
+      
+      // Build tree HTML
+      const treeContent = document.getElementById('layerTreeContent');
+      treeContent.innerHTML = '';
+      
+      if (data.layerTree.length === 0) {
+        treeContent.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📂</div>
+            <div class="empty-state-title">No Layers Found</div>
+            <div class="empty-state-description">
+              The current page appears to be empty or contains no extractable layers.
+            </div>
+          </div>
+        `;
+        return;
+      }
+      
+      data.layerTree.forEach(layer => {
+        treeContent.appendChild(createLayerTreeItem(layer));
+      });
+      
+      // Enable buttons
+      document.getElementById('selectAllBtn').disabled = false;
+      document.getElementById('clearSelectionBtn').disabled = false;
+    }
 
-      clearMessages();
-      showLoading('🎨 Extracting CSS from complete Figma hierarchy...');
+    function createLayerTreeItem(layer, parentDepth = 0) {
+      const item = document.createElement('div');
+      item.className = 'layer-item';
+      item.style.paddingLeft = `${(layer.depth * 16) + 8}px`;
+      item.dataset.layerId = layer.id;
+      
+      const hasChildren = layer.children && layer.children.length > 0;
+      
+      item.innerHTML = `
+        <input type="checkbox" class="layer-checkbox" onchange="toggleLayerSelection('${layer.id}', this.checked)">
+        ${hasChildren ? `<button class="layer-expand-toggle" onclick="toggleLayerExpansion('${layer.id}')">${layer.isExpanded ? '▼' : '▶'}</button>` : '<span class="layer-indent"></span>'}
+        <span class="layer-icon">${getLayerIcon(layer.type)}</span>
+        <span class="layer-name" title="${layer.name}">${layer.name}</span>
+        <span class="layer-type">${layer.type}</span>
+        <span class="layer-dimensions">${Math.round(layer.dimensions.width)}×${Math.round(layer.dimensions.height)}</span>
+        ${!layer.isVisible ? '<span class="layer-visibility">👁️‍🗨️</span>' : ''}
+      `;
+      
+      const container = document.createElement('div');
+      container.appendChild(item);
+      
+      // Add children if expanded
+      if (hasChildren && layer.isExpanded) {
+        layer.children.forEach(child => {
+          container.appendChild(createLayerTreeItem(child, layer.depth));
+        });
+      }
+      
+      return container;
+    }
+
+    function toggleLayerSelection(layerId, isSelected) {
+      if (isSelected) {
+        selectedLayerIds.add(layerId);
+      } else {
+        selectedLayerIds.delete(layerId);
+      }
+      
+      updateSelectionUI();
+    }
+
+    function toggleLayerExpansion(layerId) {
+      // Find layer in data and toggle expansion
+      const toggleInTree = (layers) => {
+        for (let layer of layers) {
+          if (layer.id === layerId) {
+            layer.isExpanded = !layer.isExpanded;
+            return true;
+          }
+          if (layer.children && toggleInTree(layer.children)) {
+            return true;
+          }
+        }
+        return false;
+      };
+      
+      if (layerData && toggleInTree(layerData.layerTree)) {
+        displayLayerTree(layerData);
+        updateSelectionState();
+      }
+    }
+
+    function selectAllLayers() {
+      if (!layerData) return;
+      
+      selectedLayerIds.clear();
+      layerData.flatLayers.forEach(layer => {
+        selectedLayerIds.add(layer.id);
+      });
+      
+      updateSelectionUI();
+      updateSelectionState();
+    }
+
+    function clearSelection() {
+      selectedLayerIds.clear();
+      updateSelectionUI();
+      updateSelectionState();
+    }
+
+    function updateSelectionUI() {
+      document.getElementById('selectionCount').textContent = `${selectedLayerIds.size} selected`;
+      document.getElementById('extractSelectedBtn').disabled = selectedLayerIds.size === 0;
+    }
+
+    function updateSelectionState() {
+      // Update checkboxes to match selection
+      document.querySelectorAll('.layer-checkbox').forEach(checkbox => {
+        const layerId = checkbox.closest('.layer-item').dataset.layerId;
+        checkbox.checked = selectedLayerIds.has(layerId);
+      });
+    }
+
+    function updateLayerStats(summary) {
+      document.getElementById('totalLayersCount').textContent = `${summary.total} layers`;
+      document.getElementById('visibleLayersCount').textContent = `${summary.visible} visible`;
+      document.getElementById('styledLayersCount').textContent = `${summary.withBackground} with styles`;
+    }
+
+    function extractSelectedLayers() {
+      if (selectedLayerIds.size === 0) {
+        showError('Please select at least one layer to extract CSS from.');
+        return;
+      }
+      
+      showLoading(`🎨 Extracting CSS from ${selectedLayerIds.size} selected layers...`);
+      
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'EXTRACT_SELECTED_LAYERS',
+          selectedLayerIds: Array.from(selectedLayerIds),
+          timestamp: Date.now()
+        } 
+      }, '*');
+    }
+
+    // Quick extract functions
+    function extractAllLayers() {
+      showLoading('🌟 Extracting CSS from all layers...');
       
       parent.postMessage({ 
         pluginMessage: { 
           type: 'EXTRACT_HIERARCHY_CSS',
-          options: options,
+          options: { format: 'all' },
           timestamp: Date.now()
         } 
       }, '*');
     }
 
-    function updateSelectionStatus(data) {
-      const statusElement = document.getElementById('selectionStatus');
+    function extractCurrentSelection() {
+      showLoading('🎯 Extracting CSS from current Figma selection...');
       
-      if (data && data.count > 0) {
-        const frameText = data.hasFrames ? 'with frames' : 'no frames';
-        statusElement.innerHTML = `
-          <span>📌</span>
-          <span>${data.count} selected (${frameText})</span>
-          <button class="refresh-button" onclick="refreshSelection()">🔄 Refresh</button>
-        `;
-      } else {
-        statusElement.innerHTML = `
-          <span>📌</span>
-          <span>No selection (will use all frames)</span>
-          <button class="refresh-button" onclick="refreshSelection()">🔄 Refresh</button>
-        `;
-      }
+      parent.postMessage({ 
+        pluginMessage: { 
+          type: 'EXTRACT_CURRENT_SELECTION',
+          timestamp: Date.now()
+        } 
+      }, '*');
+    }
+
+    // Utility functions
+    function getLayerIcon(type) {
+      const icons = {
+        'FRAME': '🖼️',
+        'GROUP': '📦',
+        'TEXT': '📝',
+        'RECTANGLE': '▭',
+        'ELLIPSE': '⭕',
+        'COMPONENT': '🧩',
+        'INSTANCE': '📱',
+        'IMAGE': '🖼️',
+        'VECTOR': '✨'
+      };
+      return icons[type] || '📄';
     }
 
     function showLoading(message) {
-      document.getElementById('dashboardView').style.display = 'none';
-      document.getElementById('loadingView').style.display = 'block';
-      document.getElementById('loadingMessage').textContent = message;
+      document.getElementById('globalProgress').style.display = 'block';
+      updateProgress(0, message);
       
-      // Show global progress
-      const progressBar = document.getElementById('globalProgress');
-      progressBar.style.display = 'block';
-      updateGlobalProgress(0);
+      // Disable buttons during loading
+      document.querySelectorAll('.button').forEach(btn => btn.disabled = true);
     }
 
     function hideLoading() {
-      document.getElementById('loadingView').style.display = 'none';
-      document.getElementById('dashboardView').style.display = 'block';
       document.getElementById('globalProgress').style.display = 'none';
+      
+      // Re-enable buttons
+      document.querySelectorAll('.button').forEach(btn => btn.disabled = false);
+      updateSelectionUI(); // Restore selection-dependent button states
     }
 
-    function updateProgress(data) {
-      const { progress, message } = data;
-      document.getElementById('loadingProgress').textContent = message;
-      updateGlobalProgress(progress);
-    }
-
-    function updateGlobalProgress(progress) {
+    function updateProgress(progress, message) {
       const fill = document.getElementById('globalProgressFill');
       fill.style.width = `${Math.max(0, Math.min(100, progress))}%`;
-    }
-
-    function handleExtractionComplete(data) {
-      hideLoading();
-      currentExtractionData = data;
       
-      if (data.files) {
-        showResultsModal(data);
-      } else {
-        showSuccess('Complete hierarchy extraction completed successfully!');
+      if (message && document.getElementById('breadcrumb')) {
+        document.getElementById('breadcrumb').innerHTML = `<span class="breadcrumb-item">${message}</span>`;
       }
     }
 
     function showResultsModal(data) {
+      extractionResults = data;
       const modal = document.getElementById('resultsModal');
       const modalTitle = document.getElementById('modalTitle');
       const fileTabs = document.getElementById('fileTabs');
-      const fileContent = document.getElementById('fileContent');
       const exportGrid = document.getElementById('exportGrid');
       
-      // Set modal title
-      modalTitle.textContent = `🎨 Complete Hierarchy CSS Results (${data.totalNodes || 0} nodes extracted)`;
-      
-      // Show hierarchy preview
-      if (data.visualHierarchy) {
-        const hierarchyPreview = document.getElementById('hierarchyPreview');
-        const hierarchyViz = document.getElementById('hierarchyVisualization');
-        hierarchyPreview.style.display = 'block';
-        hierarchyViz.textContent = data.visualHierarchy;
-      }
+      // Set title
+      modalTitle.textContent = `🎨 CSS Extraction Results (${data.totalNodes || 0} elements)`;
       
       // Create file tabs
       fileTabs.innerHTML = '';
@@ -856,16 +1012,6 @@ body {
         exportGrid.appendChild(exportOption);
       });
       
-      // Add "Download All" option
-      const downloadAllOption = document.createElement('div');
-      downloadAllOption.className = 'export-option';
-      downloadAllOption.textContent = '📦 Download All Files';
-      downloadAllOption.style.gridColumn = '1 / -1';
-      downloadAllOption.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-      downloadAllOption.style.color = 'white';
-      downloadAllOption.onclick = () => downloadAllFiles(data.files);
-      exportGrid.appendChild(downloadAllOption);
-      
       // Show modal
       modal.style.display = 'flex';
     }
@@ -874,8 +1020,10 @@ body {
       // Update active tab
       document.querySelectorAll('.file-tab').forEach(tab => {
         tab.classList.remove('active');
+        if (tab.textContent === fileName) {
+          tab.classList.add('active');
+        }
       });
-      event.target.classList.add('active');
       
       // Show content
       const fileContent = document.getElementById('fileContent');
@@ -883,8 +1031,6 @@ body {
         <h4>📄 ${fileName}</h4>
         <div class="code-preview">${escapeHtml(content)}</div>
       `;
-      
-      activeFileTab = fileName;
     }
 
     function downloadFile(fileName, content) {
@@ -896,22 +1042,11 @@ body {
       a.click();
       URL.revokeObjectURL(url);
       
-      showSuccess(`Downloaded ${fileName}`);
-    }
-
-    function downloadAllFiles(files) {
-      // Create a simple archive by concatenating files with separators
-      let archive = '';
-      Object.entries(files).forEach(([fileName, content]) => {
-        archive += `\n\n=== ${fileName} ===\n\n${content}`;
-      });
-      
-      downloadFile('figma-complete-hierarchy-extraction.txt', archive);
+      showSuccess(`📥 Downloaded ${fileName}`);
     }
 
     function closeModal() {
       document.getElementById('resultsModal').style.display = 'none';
-      document.getElementById('hierarchyPreview').style.display = 'none';
     }
 
     function showError(message) {
@@ -927,13 +1062,9 @@ body {
       autoHideMessage();
     }
 
-    function clearMessages() {
-      document.getElementById('statusMessage').innerHTML = '';
-    }
-
     function autoHideMessage() {
       setTimeout(() => {
-        clearMessages();
+        document.getElementById('statusMessage').innerHTML = '';
       }, 5000);
     }
 
@@ -942,6 +1073,33 @@ body {
       div.textContent = text;
       return div.innerHTML;
     }
+
+    // Message handler
+    window.addEventListener('message', function(event) {
+      const { type, data } = event.data.pluginMessage || {};
+      
+      switch (type) {
+        case 'PROGRESS_UPDATE':
+          updateProgress(data.progress, data.message);
+          break;
+          
+        case 'LAYERS_LISTED':
+          hideLoading();
+          displayLayerTree(data);
+          showSuccess(`🔍 Found ${data.totalLayers} layers in your design!`);
+          break;
+          
+        case 'EXTRACTION_COMPLETE':
+          hideLoading();
+          showResultsModal(data);
+          showSuccess('🎉 CSS extraction completed successfully!');
+          break;
+          
+        case 'ERROR':
+          showError(data.message || 'An error occurred');
+          break;
+      }
+    });
   </script>
 </body>
 </html>
